@@ -233,15 +233,24 @@ class DCK_processor(object):
     '''
     def __init__(self, path_root_folder=r'C:\Trnsys17\Work\batch'):
         self.path_root_folder = path_root_folder
-#        self.regex_dict = dict()
-#        self.parametric_table = pd.DataFrame()
+
+    def auto_parametric_table(self, parametric_table, dck_file_list):
+        # A parametric table was given. Therefore we do the standard procedure
+        # of creating a deck list from the parameters. We add those lists for
+        # all given files
+        dck_list = []
+        for dck_file in dck_file_list:
+            dck_list += dck_proc.get_parametric_dck_list(parametric_table,
+                                                         dck_file)
+        dck_proc.rewrite_dcks(dck_list)
+        dck_proc.copy_assigned_files(dck_list)
+        return dck_list
 
     def read_parametric_table(self, param_table_file):
         parametric_table = self.read_filetypes(param_table_file)
 #        print(param_df.)
 #        combis = itertools.combinations(self.vals_active, r=2)
-        parametric_table.set_index('hash', inplace=True)
-        self.parametric_table = parametric_table
+#        parametric_table.set_index('hash', inplace=True)
         return parametric_table
 
     def gen_row_hash(self):
@@ -274,27 +283,30 @@ class DCK_processor(object):
 
         return df
 
-    def get_parametric_dck_list(self, param_table, dck_file):
+    def get_parametric_dck_list(self, parametric_table, dck_file):
+        if isinstance(parametric_table, str):
+            # Default is to hand over a parametric_table DataFrame. For
+            # convenience, a file path is accepted and read into a DataFrame
+            parametric_table = self.read_parametric_table(parametric_table)
+
+        # Start building the list of deck objects
         dck_list = []
-        for hash in self.parametric_table.index.values:
+        for hash in parametric_table.index.values:
+            # For each row in the table, one deck object is created and
+            # updated with the correct information.
             dck = DCK(dck_file)
-#            dirname = os.path.dirname(dck_file)
-#            basename = os.path.basename(dck_file)
-#            hash_file_path = os.path.join(dirname, hash, basename)
+            dck.hash = str(hash)
             dck.file_path_dest = os.path.join(self.path_root_folder,
                                               dck.file_name,
-                                              hash,
+                                              dck.hash,
                                               dck.file_name+'.dck')
-            dck.hash = hash
-#            nested_dck.file_path_orig = dck.file_path_orig
-#            dck.nested_dck_list.append(nested_dck)
-#            dck.hash_list.append(hash)
-#            print(hash_file_path)
 
-            for col in self.parametric_table.columns:
-                dck.replace_dict[col] = self.parametric_table.loc[hash][col]
-#            print(replace_dict_new)
+            # Store the replacements found in the deck object
+            for col in parametric_table.columns:
+                dck.replace_dict[col] = parametric_table.loc[hash][col]
+            # Convert the replacements into regular expressions
             self.add_replacements_value_of_key(dck.replace_dict, dck)
+            # Done. Add the deck to the list.
             dck_list.append(dck)
         return dck_list
 
@@ -347,13 +359,17 @@ class DCK_processor(object):
         dck.replace_dict = dict()
 
     def create_dcks_from_file_list(self, dck_file_list):
-        dck_list = []
-        for dck_file in dck_file_list:
-            dck = DCK(dck_file)
-            dck.file_path_dest = os.path.join(self.path_root_folder,
-                                              dck.file_name,
-                                              dck.file_name+'.dck')
-            dck_list.append(dck)
+        '''Takes a list of file paths and creates deck objects for each one.
+        TODO: Previously, I changed the destination path here. But that should
+        be up to the user
+        '''
+        dck_list = [DCK(dck_file) for dck_file in dck_file_list]
+#        for dck_file in dck_file_list:
+#            dck = DCK(dck_file)
+#            dck.file_path_dest = os.path.join(self.path_root_folder,
+#                                              dck.file_name,
+#                                              dck.file_name+'.dck')
+#            dck_list.append(dck)
         return dck_list
 
 #    def rewrite_nested_dcks(self, dck_list):
@@ -374,6 +390,8 @@ class DCK_processor(object):
 
         Returns:
             dck_list (list): List of paths
+
+        TODO: Give warning when replacement was not successful
         '''
         # Process the dck file(s)
         for dck in dck_list:
@@ -433,6 +451,12 @@ def run_OptionParser(TRNExe, dck_processor):
                       help='TRNSYS deck file or list of deck files ' +
                       '(Example: "path\File1.dck path\File2.dck")')
 
+    parser.add_option('-t', '--table', action='store', type='string',
+                      dest='parametric_table',
+                      help='Path to a parametric table file with ' +
+                      'replacements to be made in the given deck files',
+                      default=None)
+
     parser.add_option('-i', '--hidden', action='store_true',
                       dest='mode_trnsys_hidden',
                       help='Hide all TRNSYS windows; default = %default',
@@ -466,23 +490,31 @@ def run_OptionParser(TRNExe, dck_processor):
     FORMAT = '%(asctime)-15s %(message)s'
     logging.basicConfig(format=FORMAT, level=options.log_level.upper())
 
-#    logging.debug('args: ' + str(args))
-
-    # Build the list of dck files. Can be stored in dck_string or in args:
-    dck_list = []
+    # Build the list of dck files. Can be given in dck_string or in args:
+    dck_file_list = []
     try:
-        dck_list = options.dck_string.split()
+        dck_file_list = options.dck_string.split()
     except Exception:
         if options.dck_string is not None:
-            dck_list = [options.dck_string]
+            dck_file_list = [options.dck_string]
         pass
 
     for arg in args:
         if '.dck' in arg:
-            dck_list.append(arg)
+            dck_file_list.append(arg)
 
-    logging.debug('List of dck files: '+str(dck_list))
-    return dck_list
+    logging.debug('List of dck files: '+str(dck_file_list))
+
+    # All the user input is read in. Now the appropriate action is taken
+    if options.parametric_table is not None:
+        # A parametric table was given. Automate the default procedure
+        dck_list = dck_proc.auto_parametric_table(options.parametric_table,
+                                                  dck_file_list)
+    else:
+        # Just a list of decks to simulate, without any modifications
+        dck_list = dck_proc.create_dcks_from_file_list(dck_file_list)
+
+    return dck_list  # Return a list of dck objects
 
 
 if __name__ == "__main__":
@@ -493,6 +525,6 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()  # Required on Windows
 
     trnexe = TRNExe()
-    dck_processor = DCK_processor()
-    dck_list = run_OptionParser(trnexe, dck_processor)
+    dck_proc = DCK_processor()
+    dck_list = run_OptionParser(trnexe, dck_proc)
     trnexe.run_TRNSYS_dck_list(dck_list)

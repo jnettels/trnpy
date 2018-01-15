@@ -73,7 +73,7 @@ if __name__ == "__main__":
             dck_list = dck_proc.get_parametric_dck_list(param_table, dck_file)
 
             dck_proc.rewrite_dcks(dck_list)
-#            print(dck_list_new)
+            print(dck_list)
 
 #            break
             dck_proc.copy_assigned_files(dck_list)
@@ -197,13 +197,14 @@ if __name__ == "__main__":
 
 #    if False:
     if True:
-        logging.basicConfig(format=FORMAT, level='WARNING')
         bokeh_app = r'C:\Users\nettelstroth\Documents\07 Python\dataexplorer'
         DatEx_data_name = 'TRNSYS Results'
         DatEx_file_path = os.path.abspath(os.path.join(bokeh_app, '..',
                                                        'trnsyspy',
 #                                       'result_test.csv'))
                                        'excel_text.xlsx'))
-        main(["bokeh", "serve", bokeh_app, "--show", "--args",
+        main(["bokeh", "serve", bokeh_app, "--show",
+              "--log-level", "warning",
+              "--args",
               "--name", DatEx_data_name,
               "--file", DatEx_file_path])
