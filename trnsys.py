@@ -44,7 +44,7 @@ class TRNExe(object):
         '''Run a TRNSYS simulation with the given deck dck_file.
         '''
         if not os.path.exists(self.path_TRNExe):
-            raise FileNotFoundError('TRNExe.exe not found at ' + self.path_TRNExe)
+            raise FileNotFoundError('TRNExe.exe not found: '+self.path_TRNExe)
 
         if self.mode_trnsys_hidden:
             mode_trnsys = '/h'  # hidden mode
@@ -70,26 +70,35 @@ class TRNExe(object):
                 dck.success = False
                 return dck
 
-        self.check_log_for_errors(dck)
-
         logging.debug('Finished PID ' + str(proc.pid))
-        dck.success = True
+
+        # Check for error messages in the log and store them in the deck object
+        if self.check_log_for_errors(dck) is False:
+            dck.success = False
+        else:
+            dck.success = True
+        # Return the deck object
         return dck
 
     def check_log_for_errors(self, dck):
+        '''Stores errors in error_msg_list. Returns False if errors are found.
+        '''
         logfile_path = os.path.splitext(dck.file_path_dest)[0] + '.log'
         try:
             with open(logfile_path, 'r') as f:
                 logfile = f.read()
         except FileNotFoundError:
             dck.error_msg_list.append('No logfile found')
-            return
+            return False
 
         re_msg = r'Fatal Error.*\n.*\n.*\n\s*(?P<msg>TRNSYS Message.*\n.*)'
         match_list = re.findall(re_msg, logfile)
-#        print(match_list)
-        for msg in match_list:
-            dck.error_msg_list.append(msg)
+        if match_list:
+            for msg in match_list:
+                dck.error_msg_list.append(msg)
+            return False
+        else:
+            return True
 
     def TRNExe_is_alive(self, pid, interval=1.0):
         '''Check whether or not a particular TRNExe.exe process is alive.
@@ -118,10 +127,10 @@ class TRNExe(object):
 
         start_time = time.time()
         if not self.mode_exec_parallel:
-            return_list = []
+            returned_dck_list = []
             for dck in dck_list:
-                ret = self.run_TRNSYS_dck(dck)
-                return_list.append(ret)
+                returned_dck = self.run_TRNSYS_dck(dck)
+                returned_dck_list.append(returned_dck)
 
         if self.mode_exec_parallel:
             if n_cores == 0:
@@ -168,22 +177,14 @@ class TRNExe(object):
 
 #            return_list = map_result.get()
 #            return_list = map_result
-            dck_list = map_result
-#            print(return_list)
+            # With imap, the iterator must be turned into a list:
+            returned_dck_list = list(map_result)
+#            print(returned_dck_list)
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
         logging.info('Finished all simulations in time: %s' % (script_time))
 
-#        self.check_for_errors(dck_list)  # See if any simulations failed
-
-#        return return_list
-        return dck_list
-
-#    def check_for_errors(self, dck_list):
-#        for dck in dck_list:
-#            if dck.success is False:
-#                logging.error('Error in dck: ' + dck.file_name)
-#                logging.error(dck.error_msg)
+        return returned_dck_list
 
 
 class DCK(object):
@@ -251,9 +252,15 @@ class DCK_processor(object):
 #        print(param_df.)
 #        combis = itertools.combinations(self.vals_active, r=2)
 #        parametric_table.set_index('hash', inplace=True)
+
+        logging.info(param_table_file+':')
+        if logging.getLogger().isEnabledFor(logging.INFO):
+            print(parametric_table)
+
         return parametric_table
 
     def gen_row_hash(self):
+        '''Unused'''
         string = 'a'
         hash = hashlib.sha1(string).hexdigest()
         return hash
@@ -270,14 +277,12 @@ class DCK_processor(object):
             # Standard format: Here we guess everything. May or may not work
             df = pd.read_csv(filepath,
                              sep=None, engine='python',  # Guess separator
-                             parse_dates=[0],  # Try to parse first column as date
+                             parse_dates=[0],  # Try to parse column 0 as date
                              infer_datetime_format=True)
         elif filetype in ['.out']:
             # Standard format: Here we guess everything. May or may not work
             df = pd.read_csv(filepath,
-                             delim_whitespace=True,
-                             parse_dates=[0],  # Try to parse first column as date
-                             infer_datetime_format=True)
+                             delim_whitespace=True)
         else:
             raise NotImplementedError('Unsupported file extension: '+filetype)
 
@@ -358,27 +363,19 @@ class DCK_processor(object):
         '''
         dck.replace_dict = dict()
 
-    def create_dcks_from_file_list(self, dck_file_list):
+    def create_dcks_from_file_list(self, dck_file_list, update_dest=False):
         '''Takes a list of file paths and creates deck objects for each one.
-        TODO: Previously, I changed the destination path here. But that should
-        be up to the user
+        If the optional argument 'update_dest' is True, the destination path
+        is updated and based on the 'path_root_folder'.
+        The default False means simulating the deck in the original folder.
         '''
         dck_list = [DCK(dck_file) for dck_file in dck_file_list]
-#        for dck_file in dck_file_list:
-#            dck = DCK(dck_file)
-#            dck.file_path_dest = os.path.join(self.path_root_folder,
-#                                              dck.file_name,
-#                                              dck.file_name+'.dck')
-#            dck_list.append(dck)
+        if update_dest:
+            for dck in dck_list:
+                dck.file_path_dest = os.path.join(self.path_root_folder,
+                                                  dck.file_name,
+                                                  dck.file_name+'.dck')
         return dck_list
-
-#    def rewrite_nested_dcks(self, dck_list):
-#        dck_list_new = []
-#        for dck in dck_list:
-#            nested_dck_list_new = self.rewrite_dcks(dck.nested_dck_list)
-#            print(nested_dck_list_new)
-#            dck_list_new += nested_dck_list_new
-#        return dck_list_new
 
     def rewrite_dcks(self, dck_list):
         '''Perform the replacements in self.replace_dict in the deck files.
@@ -432,6 +429,21 @@ class DCK_processor(object):
 
             with open(os.path.join(dck.file_path_dest), "w") as f:
                     f.write(dck.dck_text)
+
+        # Print the list of the created & copied parametric deck files
+        logging.debug('List of parametric dck files:')
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            for dck in dck_list:
+                print(dck.file_path_dest)
+
+        return
+
+    def report_errors(self, dck_list):
+        for dck in dck_list:
+            if dck.success is False:
+                print('Errors in ' + dck.file_path_dest)
+                for i, error_msg in enumerate(dck.error_msg_list):
+                    print('  '+str(i)+': '+error_msg)
         return
 
     def resample_using_Grouper(self, df, freq='2D'):
@@ -503,7 +515,10 @@ def run_OptionParser(TRNExe, dck_processor):
         if '.dck' in arg:
             dck_file_list.append(arg)
 
-    logging.debug('List of dck files: '+str(dck_file_list))
+    logging.debug('List of dck files:')
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        for dck_file in dck_file_list:
+            print(dck_file)
 
     # All the user input is read in. Now the appropriate action is taken
     if options.parametric_table is not None:
@@ -527,4 +542,5 @@ if __name__ == "__main__":
     trnexe = TRNExe()
     dck_proc = DCK_processor()
     dck_list = run_OptionParser(trnexe, dck_proc)
-    trnexe.run_TRNSYS_dck_list(dck_list)
+    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
+    dck_proc.report_errors(dck_list)
