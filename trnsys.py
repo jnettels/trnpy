@@ -142,9 +142,9 @@ class TRNExe(object):
 
             '''For short lists, imap seemed the fastest option.
             With imap, the result is a comsumable iterator'''
-            map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
+#            map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
             '''With map_async, the results are available immediately'''
-#            map_result = pool.map_async(self.run_TRNSYS_dck, dck_list)
+            map_result = pool.map_async(self.run_TRNSYS_dck, dck_list)
 #            return_list = pool.map(self.run_TRNSYS_dck, dck_list)
 
             pool.close()  # No more processes can be launched
@@ -165,20 +165,18 @@ class TRNExe(object):
 #                    done_prev = done
 #                pbar.update(total - map_result._number_left - done_prev)
 
-#            while map_result.ready() is False:
-#                remaining = map_result._number_left
-#                total = len(dck_list)/float(map_result._chunksize)
-#                fraction = (total - remaining)/total
-#                print('{:5.1f}% done'.format(fraction*100), end='\r')
-#                time.sleep(1.0)
-#                sys.stdout.flush()
+            while map_result.ready() is False:
+                remaining = map_result._number_left
+                total = len(dck_list)/float(map_result._chunksize)
+                fraction = (total - remaining)/total
+                print('{:5.1f}% done'.format(fraction*100), end='\r')
+                time.sleep(1.0)
 
             pool.join()  # Workers are removed
 
-#            return_list = map_result.get()
-#            return_list = map_result
+            returned_dck_list = map_result.get()
             # With imap, the iterator must be turned into a list:
-            returned_dck_list = list(map_result)
+#            returned_dck_list = list(map_result)
 #            print(returned_dck_list)
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
@@ -197,26 +195,29 @@ class DCK(object):
         self.error_msg_list = []
         self.success = None
         self.hash = None
-#        self.nested_dck_list = []
         self.replace_dict = dict()
         self.regex_dict = dict()
         self.regex_result_files = r'Result'
         self.assigned_files = []
         self.result_files = []
+        self.dck_text = ''
 
+        # Perform the following functions to initialize some more values
         self.load_dck_text()
         self.find_assigned_files()
 
     def load_dck_text(self):
         '''Here we store the complete text of the dck file as a property of
-        the deck object. This may or may not prove to consume too much memory.
+        the deck object.
+        HINT: This may or may not prove to consume too much memory.
+        TODO: Decide whether exceptions should be caught or raised + Should
+        I check for e.g. the right extension? (.dck, not .tpf)
         '''
-#        try:
-        with open(self.file_path_orig, 'r') as f:
-            self.dck_text = f.read()
-#        except Exception as ex:
-#            logging.error('File skipped! ' + str(ex))
-#            break
+        try:
+            with open(self.file_path_orig, 'r') as f:
+                self.dck_text = f.read()
+        except Exception as ex:
+            logging.error('File skipped! ' + str(ex))
 
     def find_assigned_files(self):
         self.assigned_files = re.findall(r'ASSIGN \"(.*)\"', self.dck_text)
