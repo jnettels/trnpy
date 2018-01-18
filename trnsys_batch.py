@@ -9,10 +9,19 @@ import os
 import trnsys
 import multiprocessing
 import pandas as pd
+import sys
 from bokeh.command.bootstrap import main
+
+'''This allows to import a module from any location'''
+#sys.path.append(os.path.abspath('somewhere'))
+#import something  # A module located at 'somewhere'
 
 
 def trnsys_batch_example_01(dck_file):
+    '''The first example for batch execution of TRNSYS with the trnsyspy module
+    We have an Excel file with combinations of parameter values and want one
+    TRNSYS simulation for each row in the table.
+    '''
     # Create a DCK_processor object. It gives us methods to create and
     # manipulate the deck files that we want to work with
     dck_proc = trnsys.DCK_processor()
@@ -30,18 +39,21 @@ def trnsys_batch_example_01(dck_file):
     # Copy all files
     dck_proc.copy_assigned_files(dck_list)
 
-    # Create the TRNSYS object
+    # Create a TRNSYS object
     trnexe = trnsys.TRNExe(
                            mode_exec_parallel=True,
-#                           mode_trnsys_hidden=True,
+                           mode_trnsys_hidden=True,
                            )
 
-    # Run TRNSYS simulations
-    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
+    # Run the TRNSYS simulations
+#    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
 
     # Report any errors that occured
     dck_proc.report_errors(dck_list)
 
+    '''Post-processing
+    This is where the example gets quite specific
+    '''
     # Process the results of the simulations. Here our goal is to combine
     # the result files of the parametric runs into DataFrames
     result_data = dict()  # The dict will have one DataFrame for each file name
@@ -82,16 +94,33 @@ def trnsys_batch_example_01(dck_file):
     df_hourly['TIME'] = pd.to_datetime(df_hourly['TIME'], unit='h',
                                        origin=pd.Timestamp('2017-01-01'))
 
-    df.rename(columns={'A_Koll': '!A_Koll',
-                       'Y_DivKoll': '!Y_DivKoll',
-                       }, inplace=True)
-    df_hourly.set_index(keys=['!A_Koll', '!Y_DivKoll', 'TIME'], inplace=True)
+    idx_cols = []
+    idx_cols_rename = dict()
+    for key in dck_list[0].replace_dict.keys():
+        idx_cols_rename[key] = '!'+key
+        idx_cols.append('!'+key)
+    idx_cols.append('TIME')
 
+    df.rename(columns=idx_cols_rename, inplace=True)
+    df_hourly.set_index(keys=idx_cols, inplace=True)
+    df_hourly = df_hourly.sort_index()
+
+    # Slicing the index to receive only the last year (since we simulated
+    # three identical years in succession).
+    df_hourly = df_hourly.loc[(slice(None), slice(None),
+                               slice('2019-01-01', '2020-01-01')), :]
+#    print(df_hourly)
+
+    # Now depending on our needs, we can also group the data by week or year
     df_weekly = dck_proc.resample_using_Grouper(df_hourly, freq='W')
-    print(df_weekly)
+#    print(df_weekly)
+    df_year = dck_proc.resample_using_Grouper(df_hourly, freq='Y')
+#    print(df_year)
 
     # With the manipulation completed, we have the option to view the result:
-    open_in_dataexplorer(df_weekly)
+    open_in_dataexplorer(df_hourly)
+#    open_in_dataexplorer(df_weekly)
+#    open_in_dataexplorer(df_year)
 
 
 def trnsys_batch_example_02(dck_file_list):
@@ -131,11 +160,13 @@ def trnsys_batch_example_02(dck_file_list):
     # e.g. weather data, load profiles, etc. to the simulation folder
     dck_proc.copy_assigned_files(dck_list)
 
+    # Create a TRNSYS object
     trnexe = trnsys.TRNExe(
                            mode_exec_parallel=True,
 #                           mode_trnsys_hidden=True,
                            )
 
+    # Run the TRNSYS simulations
     dck_list = trnexe.run_TRNSYS_dck_list(dck_list,
                                           n_cores=2
                                           )
@@ -146,13 +177,15 @@ def open_in_dataexplorer(DatEx_df):
     bokeh_app = r'C:\Users\nettelstroth\Documents\07 Python\dataexplorer'
     DatEx_data_name = 'TRNSYS Results'
     DatEx_file_path = os.path.join(bokeh_app, 'upload',
-                                   'excel_text.xlsx')
-#                                   'result_test.csv')
-
+                                   'TRNSYS_results.xlsx')
+#                                   'TRNSYS_results.csv')
+    logging.info('Saving file... ')
+    logging.info(DatEx_file_path)
     # Save this as a file that DataExplorer will load again
     DatEx_df.to_excel(DatEx_file_path, merge_cells=False)
 #    DatEx_df.to_csv(DatEx_file_path, sep=';', index=True)
 
+    logging.info('Starting DataExplorer...')
     # Call Bokeh app:
     main(["bokeh", "serve", bokeh_app, "--show",
           "--log-level", "warning",
