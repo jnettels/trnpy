@@ -21,9 +21,7 @@ import multiprocessing
 import subprocess
 import time
 import pandas as pd
-#from tqdm import tqdm
 import psutil
-import itertools
 import hashlib
 
 
@@ -121,6 +119,18 @@ class TRNExe(object):
         '''Run one TRNSYS simulation of each deck file in the dck_list.
         This is a wrapper around run_TRNSYS_dck() that allows execution in
         serial and in parallel.
+        The optional argument n_cores allows control over the used CPU cores.
+        By default, the total number of CPU cores minus one are used. This way
+        your CPU is not under 100% load - and using all cores does not
+        necessarily make total simulation time faster.
+
+        Args:
+            dck_list (list): List of DCK objects to work on
+
+            n_cores (int, optional): Number of CPU cores to use
+
+        Returns:
+            returned_dck_list (list): List of DCK objects worked on
         '''
         if len(dck_list) == 0:
             raise ValueError('The list of decks "dck_list" must not be empty.')
@@ -134,44 +144,20 @@ class TRNExe(object):
 
         if self.mode_exec_parallel:
             if n_cores == 0:
-                n_cores = min(multiprocessing.cpu_count() - 2, len(dck_list))
+                n_cores = min(multiprocessing.cpu_count() - 1, len(dck_list))
 
             logging.info('Parallel processing of ' + str(len(dck_list)) +
                          ' jobs on ' + str(n_cores) + ' cores')
             pool = multiprocessing.Pool(n_cores)
 
             '''For short lists, imap seemed the fastest option.
-            With imap, the result is a comsumable iterator'''
+            With imap, the result is a consumable iterator'''
 #            map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
             '''With map_async, the results are available immediately'''
             map_result = pool.map_async(self.run_TRNSYS_dck, dck_list)
-#            return_list = pool.map(self.run_TRNSYS_dck, dck_list)
 
             pool.close()  # No more processes can be launched
-
-            # Print progress counter
-#            total = len(dck_list)/float(map_result._chunksize)
-#            for result in tqdm(map_result, total=len(dck_list), unit=' Jobs'):
-#                pass
-
-#            total = len(dck_list)/float(map_result._chunksize)
-#            total = len(dck_list)
-#            print(map_result._chunksize)
-#            with tqdm(total=total, unit=' Jobs') as pbar:
-#                done_prev = 0
-#                while map_result.ready() is False:
-#                    done = total - map_result._number_left
-#                    pbar.update(done-done_prev)
-#                    done_prev = done
-#                pbar.update(total - map_result._number_left - done_prev)
-
-            while map_result.ready() is False:
-                remaining = map_result._number_left
-                total = len(dck_list)/float(map_result._chunksize)
-                fraction = (total - remaining)/total
-                print('{:5.1f}% done'.format(fraction*100), end='\r')
-                time.sleep(1.0)
-
+            self.print_progress(map_result, start_time)
             pool.join()  # Workers are removed
 
             returned_dck_list = map_result.get()
@@ -180,9 +166,61 @@ class TRNExe(object):
 #            print(returned_dck_list)
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
+        script_time = str(script_time).split('.')[0]
         logging.info('Finished all simulations in time: %s' % (script_time))
 
         return returned_dck_list
+
+    def print_progress(self, map_result, start_time):
+        '''Prints info about the multiprocessing progress to the screen.
+        Measures and prints the percentage of simulations done and an
+        estimation of the remaining time.
+        The parameter 'map_result' must be the return of a pool.map_async()
+        function. Please be aware that this mapping splits the work list into
+        'chunks'. 'map_result._number_left' only updates once one chunk has
+        been completed. Therefore the progress percentage does not necessarily
+        update after every finished TRNSYS simulation.
+
+        Args:
+            map_result (map_async object): Return of 'pool.map_async'
+
+            start_time (time): Simulation start time
+
+        Returns:
+            None
+        '''
+        total = map_result._number_left
+        remaining_last = total
+        while map_result.ready() is False:  # Repeat this until finished
+            remaining = map_result._number_left
+            fraction = (total - remaining)/total
+            t_elapsed = pd.to_timedelta(time.time() - start_time, unit='s')
+
+            if total - remaining != 0:
+                # The remaining time estimation is only done after at least
+                # one job has finished
+                if remaining_last != remaining:
+                    # Update the 'total' estimation, when new jobs have
+                    # finished
+                    t_total = t_elapsed/(total - remaining)*total
+                    remaining_last = remaining
+                elif t_total < t_elapsed:
+                    t_total = t_elapsed
+                t_remain = t_total - t_elapsed
+                # Format the text message
+                text = '{:5.1f}% done. Time elapsed: {}, remaining: {}'\
+                       .format(fraction*100,
+                               str(t_elapsed).split('.')[0],
+                               str(t_remain).split('.')[0])
+            else:
+                # Until the first job has finished, do this:
+                text = '{:5.1f}% done. Time elapsed: {}'\
+                       .format(fraction*100,
+                               str(t_elapsed).split('.')[0])
+            # Do the print
+            print(text, end='\r')
+            time.sleep(1.0)  # Sleep a certain number of seconds
+        return
 
 
 class DCK(object):
@@ -207,7 +245,7 @@ class DCK(object):
         self.find_assigned_files()
 
     def load_dck_text(self):
-        '''Here we store the complete text of the dck file as a property of
+        '''Here we store the complete text of the deck file as a property of
         the deck object.
         HINT: This may or may not prove to consume too much memory.
         TODO: Decide whether exceptions should be caught or raised + Should
@@ -391,7 +429,7 @@ class DCK_processor(object):
 
         TODO: Give warning when replacement was not successful
         '''
-        # Process the dck file(s)
+        # Process the deck file(s)
         for dck in dck_list:
             # Perform the replacements:
             for re_find, re_replace in dck.regex_dict.items():
