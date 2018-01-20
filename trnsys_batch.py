@@ -51,76 +51,61 @@ def trnsys_batch_example_01(dck_file):
     # Report any errors that occured
     dck_proc.report_errors(dck_list)
 
-    '''Post-processing
-    This is where the example gets quite specific
-    '''
-    # Process the results of the simulations. Here our goal is to combine
-    # the result files of the parametric runs into DataFrames
-    result_data = dict()  # The dict will have one DataFrame for each file name
-    for dck in dck_list:
-        for result_file in dck.result_files:
-            if 'simsum' in result_file:
-                # Skip simsum files for now, they are difficult to read
-                continue
+    # Post-processing: This is where the example gets quite specific
+    def read_file_function(result_file_path):
+        '''Different TRNSYS printer outputs are formatted differently. But
+        we can still use the existing read_filetypes(), we only have to provide
+        some additional arguments for certain result files.
+        '''
+        if 'simsum' in result_file_path:
+            # Adapt read_filetypes for these files
+            return dck_proc.read_filetypes(result_file_path,
+                                           skiprows=33,
+                                           skipfooter=2,
+                                           engine='python')
+        else:  # All other files can be read automatically
+            return dck_proc.read_filetypes(result_file_path)
 
-            # Read the result file into a DataFrame
-            result_file_path = os.path.join(os.path.dirname(
-                                            dck.file_path_dest),
-                                            result_file)
-            df_new = dck_proc.read_filetypes(result_file_path)
+    # Collect the results of the simulations. Our goal is to combine
+    # the result files of the parametric runs into DataFrames.
+    result_data = dck_proc.results_collect(dck_list, read_file_function)
 
-            # Add the 'hash' and all the key, value pairs to the DataFrame
-            df_new['hash'] = [dck.hash]*len(df_new)
-            for key, value in dck.replace_dict.items():
-                df_new[key] = [value]*len(df_new)
+    # Put the time and parameter columns into the index of the DataFrame.
+    result_data = dck_proc.results_create_index(result_data,
+                                                dck_list[0].replace_dict,
+                                                '2003-01-01')
 
-            # Add the DataFrame to the dict of result files
-            if result_file in result_data.keys():
-                df_old = result_data[result_file]
-            else:
-                df_old = pd.DataFrame()
-            # Append the old and new df, with a new index. Add it to the dict
-            df = pd.concat([df_old, df_new], ignore_index=True)
-            result_data[result_file] = df
-
-    # We have got all the results in memory. Now we can start manipulating
-    # them. Here we make the TIME column a Pandas DateTime object and add
-    # the parametric values to the index. Then we resample the hourly data
-    # to weekly data.
+    # Now we have got all the results in memory. We can call them by their file
+    # paths (as assigned in TRNSYS).
     df_hourly = result_data[r'Result\temperaturen_1.out']
-
-    # Convert TIME column to float and then to datetime
-    df_hourly['TIME'] = [float(string) for string in df_hourly['TIME']]
-    df_hourly['TIME'] = pd.to_datetime(df_hourly['TIME'], unit='h',
-                                       origin=pd.Timestamp('2017-01-01'))
-
-    idx_cols = []
-    idx_cols_rename = dict()
-    for key in dck_list[0].replace_dict.keys():
-        idx_cols_rename[key] = '!'+key
-        idx_cols.append('!'+key)
-    idx_cols.append('TIME')
-
-    df.rename(columns=idx_cols_rename, inplace=True)
-    df_hourly.set_index(keys=idx_cols, inplace=True)
-    df_hourly = df_hourly.sort_index()
+#    print(df_hourly)
 
     # Slicing the index to receive only the last year (since we simulated
     # three identical years in succession).
-    df_hourly = df_hourly.loc[(slice(None), slice(None),
-                               slice('2019-01-01', '2020-01-01')), :]
+#    df_hourly = df_hourly.loc[(slice(None), slice(None), slice(None),
+#                               slice('2005-01-01', '2006-01-01')), :]
 #    print(df_hourly)
 
     # Now depending on our needs, we can also group the data by week or year
-    df_weekly = dck_proc.resample_using_Grouper(df_hourly, freq='W')
+    df_weekly = dck_proc.results_resample(df_hourly, freq='W')
 #    print(df_weekly)
-    df_year = dck_proc.resample_using_Grouper(df_hourly, freq='Y')
+    df_monthly = dck_proc.results_resample(df_hourly, freq='M')
+#    print(df_monthly)
+    df_year = dck_proc.results_resample(df_hourly, freq='Y')
 #    print(df_year)
 
+    df_energy_1 = result_data[r'Result\simsum_energie_1.out']
+    df_energy_2 = result_data[r'Result\simsum_energie_2.out']
+    df_energy = pd.concat([df_energy_1, df_energy_2], axis=1)
+    df_energy.drop(columns=['Month', 'hash', 'hash.1'], inplace=True)
+#    print(df_energy)
+
     # With the manipulation completed, we have the option to view the result:
-    open_in_dataexplorer(df_hourly)
-#    open_in_dataexplorer(df_weekly)
-#    open_in_dataexplorer(df_year)
+#    open_in_dataexplorer(dck_proc, df_hourly)
+#    open_in_dataexplorer(dck_proc, df_weekly)
+#    open_in_dataexplorer(dck_proc, df_monthly)
+#    open_in_dataexplorer(dck_proc, df_year)
+    open_in_dataexplorer(dck_proc, df_energy)
 
 
 def trnsys_batch_example_02(dck_file_list):
@@ -163,25 +148,29 @@ def trnsys_batch_example_02(dck_file_list):
     # Create a TRNSYS object
     trnexe = trnsys.TRNExe(
                            mode_exec_parallel=True,
-#                           mode_trnsys_hidden=True,
+                           mode_trnsys_hidden=True,
                            )
 
     # Run the TRNSYS simulations
     dck_list = trnexe.run_TRNSYS_dck_list(dck_list,
-                                          n_cores=2
+                                          n_cores=7
                                           )
 
 
-def open_in_dataexplorer(DatEx_df):
+def open_in_dataexplorer(dck_proc, DatEx_df):
+    # Put '!' in front of index column names, to mark them as classifications
+    DatEx_df = dck_proc.mark_index_for_DataExplorer(DatEx_df)
+
     # Prepare settings:
     bokeh_app = r'C:\Users\nettelstroth\Documents\07 Python\dataexplorer'
     DatEx_data_name = 'TRNSYS Results'
     DatEx_file_path = os.path.join(bokeh_app, 'upload',
                                    'TRNSYS_results.xlsx')
 #                                   'TRNSYS_results.csv')
-    logging.info('Saving file... ')
+    logging.info('Saving file for DataExplorer... ')
     logging.info(DatEx_file_path)
     # Save this as a file that DataExplorer will load again
+    print(DatEx_df.head())
     DatEx_df.to_excel(DatEx_file_path, merge_cells=False)
 #    DatEx_df.to_csv(DatEx_file_path, sep=';', index=True)
 
@@ -211,8 +200,8 @@ if __name__ == "__main__":
 #    logging.basicConfig(format=FORMAT, level='ERROR')
 
     dck_file_list = [
-#        r'Steinfurt_180105\Steinfurt_180105.dck',
-        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105.dck',
+        r'Steinfurt_180105\Steinfurt_180105.dck',
+#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test1.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test2.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test3.dck',

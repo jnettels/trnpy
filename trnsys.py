@@ -304,24 +304,35 @@ class DCK_processor(object):
         hash = hashlib.sha1(string).hexdigest()
         return hash
 
-    def read_filetypes(self, filepath):
+    def read_filetypes(self, filepath, **args):
         '''Read any file type with stored data and return the Pandas DataFrame.
-        Wrapper around Pandas' read_excel().
+        Wrapper around Pandas' read_excel() and read_csv().
+        Please note: With 'args', you can pass any (named) parameter down
+        to the Pandas functions. The TRNSYS printer adds some useless rows
+        at the top and bottom of the file? No problem, just define 'skiprows'
+        and 'skipfooter'. For all options, see:
+        http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html
         '''
         filetype = os.path.splitext(os.path.basename(filepath))[1]
         if filetype in ['.xlsx', '.xls']:
             # Excel can be read automatically
-            df = pd.read_excel(filepath)  # Pandas function
+            df = pd.read_excel(filepath, **args)  # Pandas function
         elif filetype in ['.csv']:
             # Standard format: Here we guess everything. May or may not work
             df = pd.read_csv(filepath,
                              sep=None, engine='python',  # Guess separator
                              parse_dates=[0],  # Try to parse column 0 as date
-                             infer_datetime_format=True)
+                             infer_datetime_format=True,
+                             **args)
         elif filetype in ['.out']:
-            # Standard format: Here we guess everything. May or may not work
+            # Standard format for TRNSYS: Separator is whitespace
             df = pd.read_csv(filepath,
-                             delim_whitespace=True)
+                             delim_whitespace=True,
+                             **args)
+        elif filetype in ['.dat', '.txt']:
+            logging.warning('Unsupported file extension: ' + filetype +
+                            '. Trying to read it like a csv file.')
+            df = pd.read_csv(filepath, **args)
         else:
             raise NotImplementedError('Unsupported file extension: '+filetype)
 
@@ -384,9 +395,11 @@ class DCK_processor(object):
         '''
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
-            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>\W*\d*\W?\d*\n)'
+            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>.*)'
+#            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>\W*\d*\W?\d*\n)'
             # Replace match with key (capture group) plus the new value
-            re_replace = r'\g<key>'+str(value)+'\n'
+            re_replace = r'\g<key>'+str(value)
+#            re_replace = r'\g<key>'+str(value)+'\n'
             self.add_replacements({re_find: re_replace}, dck)
 
     def disable_plotters(self, dck):
@@ -488,10 +501,128 @@ class DCK_processor(object):
                     print('  '+str(i)+': '+error_msg)
         return
 
-    def resample_using_Grouper(self, df, freq='2D'):
+    def results_collect(self, dck_list, read_file_function, create_index=True):
+        '''Collect the results of the simulations. Our goal is to combine
+        the result files of the parametric runs into DataFrames. The DataFrames
+        contain the raw data plus columns for each of the replacements made
+        in the deck files. This allows you to identify each parametric run.
+
+        The assumption is that all simulations produced the same set of result
+        files. The dict 'result_data' will have one DataFrame for each file
+        name. In order for this to work, the TRNSYS out files have to be read
+        in and converted into Pandas DataFrames. And different TRNSYS printer
+        types format their output in different ways. Therefore there can be
+        no fully automated reading of all TRNSYS results.
+
+        Instead, you have to provide the function that manages reading the
+        files ('read_file_function'). In some cases, it can look like this:
+
+        def read_file_function(result_file_path):
+            return dck_proc.read_filetypes(result_file_path)
+
+        This means that you can utilize the existing read_filetypes(), which
+        can already handle different file types. Please see the docs for
+        read_filetypes() for info about passing over additional arguments to
+        customize it to your needs.
+
+        Args:
+            dck_list (list): A list of DCK objects
+
+            read_file_function (func): A function that takes one argument (a
+            file path) and returns a Pandas DataFrame.
+
+            create_index (bool, optional): Move time and parameter columns to
+            the index of the DataFrame. Default: True
+
+        Returns:
+            result_data (dict): A dictionary with one DataFrame for each file
+        '''
+        result_data = dict()
+        for dck in dck_list:
+            for result_file in dck.result_files:
+                # Construct the full path to the result file
+                result_file_path = os.path.join(os.path.dirname(
+                                                dck.file_path_dest),
+                                                result_file)
+                # Use the provided function to read the file
+                df_new = read_file_function(result_file_path)
+
+                # Add the 'hash' and all the key, value pairs to the DataFrame
+                df_new['hash'] = [dck.hash]*len(df_new)
+                for key, value in dck.replace_dict.items():
+                    df_new[key] = [value]*len(df_new)
+
+                # Add the DataFrame to the dict of result files
+                if result_file in result_data.keys():
+                    df_old = result_data[result_file]
+                else:
+                    df_old = pd.DataFrame()
+                # Append the old and new df, with a new index.
+                df = pd.concat([df_old, df_new], ignore_index=True)
+                # Add it to the dict
+                result_data[result_file] = df
+        return result_data
+
+    def results_create_index(self, result_data, replace_dict, origin):
+        '''Put the time and parameter columns into the index of the DataFrame.
+        The function expects the return of results_collect(). This typically
+        creates a multi-index and is arguably how DataFrames are supposed to
+        be handled.
+
+        Args:
+            result_data (dict): The return of the function results_collect()
+
+            replace_dict (dict): Is required to identify the parameter columns
+
+            origin (str): Start date, e.g. '2003-01-01'. TRNSYS does not care
+            for years or days, but to get a pretty DataFrame we use datetime
+            for the time column, which needs a fully defined date.
+
+        Returns:
+            result_data (dict): A dictionary with one DataFrame for each file
+        '''
+        for key, df in result_data.items():
+            if 'TIME' in df.columns:
+                t_col = 'TIME'
+            elif 'Time' in df.columns:
+                t_col = 'Time'
+            else:
+                continue
+            # Convert TIME column to float and then to datetime
+            df[t_col] = [float(string) for string in df[t_col]]
+            df[t_col] = pd.to_datetime(df[t_col], unit='h',
+                                       origin=pd.Timestamp(origin))
+
+            # Create a list and use that as the new index columns
+            idx_cols = list(replace_dict.keys()) + [t_col]
+            df.set_index(keys=idx_cols, inplace=True)
+            df = df.sort_index()
+
+        return result_data
+
+    def results_resample(self, df, freq):
+        '''Resample a multi-indexed DataFrame to a new frequency.
+        Expects the time column to be at last position in the multi-index.
+        '''
         level_values = df.index.get_level_values
-        return (df.groupby([level_values(i) for i in [0, 1]]
+        levels = range(len(df.index.names))[:-1]  # All columns except time
+        return (df.groupby([level_values(i) for i in levels]
                            + [pd.Grouper(freq=freq, level=-1)]).sum())
+
+    def mark_index_for_DataExplorer(self, df):
+        '''Put '!' in front of index column names, to mark them as
+        classifications. Is not applied to time columns.
+        '''
+        idx_cols_rename = []
+        for name in df.index.names:
+            if name not in ['TIME', 'Time', 'time']:
+                idx_cols_rename.append('!'+name)
+            else:
+                idx_cols_rename.append(name)
+
+        print(idx_cols_rename)
+        df.index = df.index.rename(idx_cols_rename)
+        return df
 
 
 def run_OptionParser(TRNExe, dck_processor):
