@@ -426,14 +426,17 @@ class DCK_processor(object):
 
         Returns:
             dck_list (list): List of paths
-
-        TODO: Give warning when replacement was not successful
         '''
         # Process the deck file(s)
         for dck in dck_list:
             # Perform the replacements:
             for re_find, re_replace in dck.regex_dict.items():
-                dck.dck_text = re.sub(re_find, re_replace, dck.dck_text)
+                dck.dck_text, number_of_subs_made = re.subn(re_find,
+                                                            re_replace,
+                                                            dck.dck_text)
+                if number_of_subs_made == 0:
+                    logging.warning('Warning: Replacement not successful, ' +
+                                    'because regex was not found: '+re_find)
 
         return
 
