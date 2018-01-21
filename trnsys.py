@@ -248,14 +248,13 @@ class DCK(object):
         '''Here we store the complete text of the deck file as a property of
         the deck object.
         HINT: This may or may not prove to consume too much memory.
-        TODO: Decide whether exceptions should be caught or raised + Should
-        I check for e.g. the right extension? (.dck, not .tpf)
         '''
-        try:
+        if os.path.splitext(self.file_path_orig)[1] != '.dck':
+            msg = self.file_path_orig+' has the wrong file type, must be .dck'
+            raise ValueError(msg)
+        else:
             with open(self.file_path_orig, 'r') as f:
                 self.dck_text = f.read()
-        except Exception as ex:
-            logging.error('File skipped! ' + str(ex))
 
     def find_assigned_files(self):
         self.assigned_files = re.findall(r'ASSIGN \"(.*)\"', self.dck_text)
@@ -561,6 +560,11 @@ class DCK_processor(object):
                 df = pd.concat([df_old, df_new], ignore_index=True)
                 # Add it to the dict
                 result_data[result_file] = df
+
+        logging.info('Collected result files:')
+        if logging.getLogger().isEnabledFor(logging.INFO):
+            for file in result_data.keys():
+                print(file)
         return result_data
 
     def results_create_index(self, result_data, replace_dict, origin):
