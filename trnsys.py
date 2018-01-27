@@ -23,6 +23,7 @@ import time
 import pandas as pd
 import psutil
 import hashlib
+from tkinter import Tk, filedialog
 
 
 class TRNExe(object):
@@ -628,6 +629,55 @@ class DCK_processor(object):
         return df
 
 
+def file_dialog_dck(initialdir=os.getcwd()):
+    '''This function presents a file dialog for one or more TRNSYS deck files.
+
+    Args:
+        None
+
+    Return:
+        paths (List): List of file paths
+    '''
+    root = Tk()
+    root.withdraw()
+    files = filedialog.askopenfilenames(
+                initialdir=initialdir,
+                title='Please choose a TRNSYS Input File',
+                filetypes=(('TRNSYS Input File', '*.dck'),)
+                )
+    files = list(files)
+    if files == []:
+        paths = None
+    else:
+        paths = [os.path.abspath(dck_file) for dck_file in files]
+    return paths
+
+
+def file_dialog_parametrics(initialdir=os.getcwd()):
+    '''This function presents a file dialog fora parametric table file.
+
+    Args:
+        None
+
+    Return:
+        path (str): File path
+    '''
+    root = Tk()
+    root.withdraw()
+    file = filedialog.askopenfilename(
+                initialdir=initialdir,
+                title='Choose a parametric table, or ' +
+                'cancel to perform a regular simulation',
+                filetypes=(('Excel File', '*.xlsx'),
+                           ('CSV File', '*.csv *.txt *.dat'))
+                )
+    if file == '':
+        path = None
+    else:
+        path = os.path.abspath(file)
+    return path
+
+
 def run_OptionParser(TRNExe, dck_processor):
     '''Define and run the option parser. Set the user input and return the list
     of decks.
@@ -642,8 +692,9 @@ def run_OptionParser(TRNExe, dck_processor):
 
     parser.add_argument('--version', action='version', version='%(prog)s 0.1')
 
-    parser.add_argument('dck', help='One or multiple paths to ' +
-                        'TRNSYS deck files', type=str, nargs='+')
+    parser.add_argument('-d', '--deck', dest='dck', help='One or multiple ' +
+                        'paths to TRNSYS input files. If not specified, a ' +
+                        'file dialog opens instead', type=str, nargs='+')
 
     parser.add_argument('-i', '--hidden', action='store_true',
                         dest='mode_trnsys_hidden',
@@ -670,7 +721,7 @@ def run_OptionParser(TRNExe, dck_processor):
     parser.add_argument('-l', '--log_level', action='store', dest='log_level',
                         help='LOG_LEVEL can be one of: debug, info, ' +
                         'warning, error or critical',
-                        default='warning')
+                        default='info')
 
     parser.add_argument('-r', '--root_folder', action='store',
                         dest='root_folder',
@@ -691,8 +742,14 @@ def run_OptionParser(TRNExe, dck_processor):
     FORMAT = '%(asctime)-15s %(message)s'
     logging.basicConfig(format=FORMAT, level=args.log_level.upper())
 
-    # Get list of deck files (and convert relative paths into absolute paths)
-    dck_file_list = [os.path.abspath(dck_file) for dck_file in args.dck]
+    if args.dck is None:
+        dck_file_list = file_dialog_dck()
+        if dck_file_list is None:
+            logging.debug('Empty selection, exit program.')
+            exit()
+    else:
+        # Get list of deck files (and convert relative into absolute paths)
+        dck_file_list = [os.path.abspath(dck_file) for dck_file in args.dck]
 
     logging.debug('List of dck files:')
     if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -705,10 +762,15 @@ def run_OptionParser(TRNExe, dck_processor):
         dck_list = dck_proc.auto_parametric_table(args.parametric_table,
                                                   dck_file_list)
     else:
-        # Just a list of decks to simulate, without any modifications
-        dck_list = dck_proc.create_dcks_from_file_list(
-                        dck_file_list,
-                        update_dest=args.copy_files)
+        parametric_table = file_dialog_parametrics()
+        if parametric_table is not None:
+            dck_list = dck_proc.auto_parametric_table(parametric_table,
+                                                      dck_file_list)
+        else:
+            # Just a list of decks to simulate, without any modifications
+            dck_list = dck_proc.create_dcks_from_file_list(
+                          dck_file_list,
+                          update_dest=args.copy_files)
 
     if args.copy_files:  # Copy all required files to --root_folder
         dck_proc.copy_assigned_files(dck_list)
