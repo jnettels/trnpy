@@ -9,7 +9,6 @@ import os
 import trnsys
 import multiprocessing
 import pandas as pd
-import sys
 from bokeh.command.bootstrap import main
 
 '''This allows to import a module from any location'''
@@ -30,6 +29,10 @@ def trnsys_batch_example_01(dck_file):
     param_table_file = r'Parametrics.xlsx'
     param_table = dck_proc.read_parametric_table(param_table_file)
 
+    # Modify the table on demand (select only certain rows)
+#    param_table = param_table.loc[0:1]
+#    print(param_table)
+
     # Create a deck list from the parameters and the original deck file
     dck_list = dck_proc.get_parametric_dck_list(param_table, dck_file)
 
@@ -46,7 +49,7 @@ def trnsys_batch_example_01(dck_file):
                            )
 
     # Run the TRNSYS simulations
-#    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
+    dck_list = trnexe.run_TRNSYS_dck_list(dck_list, n_cores=7)
 
     # Report any errors that occured
     dck_proc.report_errors(dck_list)
