@@ -19,5 +19,5 @@ setup(
     options={'build_exe': {'packages': ['idna', 'numpy']}},
     version=version,
     description='Parallelized TRNSYS simulation with Python',
-    executables=[Executable('trnpy.py', base=None)],
+    executables=[Executable('trnpy.py', base=None, icon='res/icon.ico')],
 )
