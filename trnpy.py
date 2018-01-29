@@ -471,7 +471,17 @@ class DCK_processor(object):
                 if not os.path.exists(os.path.dirname(destination_file)):
                     os.makedirs(os.path.dirname(destination_file))
 
-                shutil.copy2(source_file, destination_file)
+                if not source_file == destination_file:
+                    try:
+                        shutil.copy2(source_file, destination_file)
+                    except Exception as ex:
+                        logging.debug('Error in ' + dck.file_name)
+                        raise
+                else:
+                    logging.debug(dck.file_name + ': Copy source and ' +
+                                  'destination are equal for file:')
+                    if logging.getLogger().isEnabledFor(logging.DEBUG):
+                        print(source_file)
 
             # For result files, we must create the folders
             for file in dck.result_files:
