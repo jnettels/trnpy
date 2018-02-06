@@ -6,7 +6,7 @@ Created on Fri Jan  5 18:01:41 2018
 """
 import logging
 import os
-import trnsys
+import trnpy
 import multiprocessing
 import pandas as pd
 from bokeh.command.bootstrap import main
@@ -23,7 +23,7 @@ def trnsys_batch_example_01(dck_file):
     '''
     # Create a DCK_processor object. It gives us methods to create and
     # manipulate the deck files that we want to work with
-    dck_proc = trnsys.DCK_processor()
+    dck_proc = trnpy.DCK_processor()
 
     # Load a parametric table located in the current directory
     param_table_file = r'Parametrics.xlsx'
@@ -43,13 +43,14 @@ def trnsys_batch_example_01(dck_file):
     dck_proc.copy_assigned_files(dck_list)
 
     # Create a TRNSYS object
-    trnexe = trnsys.TRNExe(
-                           mode_exec_parallel=True,
-                           mode_trnsys_hidden=True,
-                           )
+    trnexe = trnpy.TRNExe(
+                          mode_exec_parallel=True,
+                          mode_trnsys_hidden=True,
+                          n_cores=7,
+                          )
 
     # Run the TRNSYS simulations
-    dck_list = trnexe.run_TRNSYS_dck_list(dck_list, n_cores=7)
+    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
 
     # Report any errors that occured
     dck_proc.report_errors(dck_list)
@@ -114,7 +115,7 @@ def trnsys_batch_example_01(dck_file):
 def trnsys_batch_example_02(dck_file_list):
     # Create a DCK_processor object. It gives us methods to create and
     # manipulate the deck files that we want to work with
-    dck_proc = trnsys.DCK_processor()
+    dck_proc = trnpy.DCK_processor()
 
     # Convert the list of file paths to decks into a list of deck objects.
     # These objects will later contain information on the success and
@@ -149,15 +150,14 @@ def trnsys_batch_example_02(dck_file_list):
     dck_proc.copy_assigned_files(dck_list)
 
     # Create a TRNSYS object
-    trnexe = trnsys.TRNExe(
-                           mode_exec_parallel=True,
-                           mode_trnsys_hidden=True,
-                           )
+    trnexe = trnpy.TRNExe(
+                          mode_exec_parallel=True,
+                          mode_trnsys_hidden=True,
+                          n_cores=7,
+                          )
 
     # Run the TRNSYS simulations
-    dck_list = trnexe.run_TRNSYS_dck_list(dck_list,
-                                          n_cores=7
-                                          )
+    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
 
 
 def open_in_dataexplorer(dck_proc, DatEx_df):

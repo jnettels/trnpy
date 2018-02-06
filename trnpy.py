@@ -33,11 +33,25 @@ class TRNExe(object):
     def __init__(self,
                  path_TRNExe=r'C:\Trnsys17\Exe\TRNExe.exe',
                  mode_trnsys_hidden=False,
-                 mode_exec_parallel=False
+                 mode_exec_parallel=False,
+                 n_cores=0
                  ):
+        '''
+        The optional argument n_cores allows control over the used CPU cores.
+        By default, the total number of CPU cores minus one are used. This way
+        your CPU is not under 100% load - and using all cores does not
+        necessarily make total simulation time faster.
+
+        Args:
+            n_cores (int, optional): Number of CPU cores to use
+
+        Returns:
+            None
+        '''
         self.path_TRNExe = path_TRNExe
         self.mode_trnsys_hidden = mode_trnsys_hidden
         self.mode_exec_parallel = mode_exec_parallel
+        self.n_cores = n_cores
 
     def run_TRNSYS_dck(self, dck):
         '''Run a TRNSYS simulation with the given deck dck_file.
@@ -116,19 +130,13 @@ class TRNExe(object):
 
         return True
 
-    def run_TRNSYS_dck_list(self, dck_list, n_cores=0):
+    def run_TRNSYS_dck_list(self, dck_list):
         '''Run one TRNSYS simulation of each deck file in the dck_list.
         This is a wrapper around run_TRNSYS_dck() that allows execution in
         serial and in parallel.
-        The optional argument n_cores allows control over the used CPU cores.
-        By default, the total number of CPU cores minus one are used. This way
-        your CPU is not under 100% load - and using all cores does not
-        necessarily make total simulation time faster.
 
         Args:
             dck_list (list): List of DCK objects to work on
-
-            n_cores (int, optional): Number of CPU cores to use
 
         Returns:
             returned_dck_list (list): List of DCK objects worked on
@@ -144,6 +152,7 @@ class TRNExe(object):
                 returned_dck_list.append(returned_dck)
 
         if self.mode_exec_parallel:
+            n_cores = self.n_cores
             if n_cores == 0:
                 n_cores = min(multiprocessing.cpu_count() - 1, len(dck_list))
 
@@ -652,11 +661,12 @@ def file_dialog_dck(initialdir=os.getcwd()):
     Return:
         paths (List): List of file paths
     '''
+    title = 'Please choose a TRNSYS Input File'
+    logging.info(title)
     root = Tk()
     root.withdraw()
     files = filedialog.askopenfilenames(
-                initialdir=initialdir,
-                title='Please choose a TRNSYS Input File',
+                initialdir=initialdir, title=title,
                 filetypes=(('TRNSYS Input File', '*.dck'),)
                 )
     files = list(files)
@@ -676,12 +686,13 @@ def file_dialog_parametrics(initialdir=os.getcwd()):
     Return:
         path (str): File path
     '''
+    title = 'Choose a parametric table, or cancel to perform '\
+            'a regular simulation'
+    logging.info(title)
     root = Tk()
     root.withdraw()
     file = filedialog.askopenfilename(
-                initialdir=initialdir,
-                title='Choose a parametric table, or ' +
-                'cancel to perform a regular simulation',
+                initialdir=initialdir, title=title,
                 filetypes=(('Excel File', '*.xlsx'),
                            ('CSV File', '*.csv *.txt *.dat'))
                 )
@@ -694,39 +705,54 @@ def file_dialog_parametrics(initialdir=os.getcwd()):
 
 def run_OptionParser(TRNExe, dck_proc):
     '''Define and run the option parser. Set the user input and return the list
-    of decks.
+    of decks. Needs TRNExe and dck_proc to get and set the option values.
+
+    Args:
+        TRNExe (TRNExe object): An instance of the TRNExe class
+
+        dck_proc (DCK_processor object): An instance of the DCK_processor class
+
+    Returns:
+        dck_list (list): A list of dck objects
+
     '''
-    description = 'Simulate all the TRNSYS deck files specified as "dck" '\
-                  'arguments in serial or parallel. Specify a '\
-                  'PARAMETRIC_TABLE file to perform simulations for different'\
-                  ' sets of parameters. See documentation for further help.'
+    description = 'TRNpy: Parallelized TRNSYS simulation with Python. '\
+        'Simulate all the TRNSYS deck files specified as DCK '\
+        'arguments in serial or parallel. Specify a '\
+        'PARAMETRIC_TABLE file to perform simulations for different'\
+        ' sets of parameters. See documentation for further help.'
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.
                                      ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--version', action='version', version='%(prog)s 0.3')
+#    parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
-    parser.add_argument('-d', '--deck', dest='dck', help='One or multiple ' +
+    group1 = parser.add_argument_group('Important options', 'Use the ' +
+                                       'following options to define how to ' +
+                                       'run this program.')
+
+    group1.add_argument('-d', '--deck', dest='dck', help='One or multiple ' +
                         'paths to TRNSYS input files. If not specified, a ' +
                         'file dialog opens instead', type=str, nargs='+')
 
-    parser.add_argument('--hidden', action='store_true',
+    group1.add_argument('--hidden', action='store_true',
                         dest='mode_trnsys_hidden',
                         help='Hide all TRNSYS windows',
                         default=TRNExe.mode_trnsys_hidden)
 
-    parser.add_argument('-p', '--parallel', action='store_true',
+    group1.add_argument('-p', '--parallel', action='store_true',
                         dest='mode_exec_parallel',
                         help='Run simulations in parallel',
                         default=TRNExe.mode_exec_parallel)
 
-    parser.add_argument('-c', '--copy_files', action='store_true',
+    group1.add_argument('-c', '--copy_files', action='store_true',
                         dest='copy_files',
                         help='Copy simulation files to a new folder within ' +
-                        'ROOT_FOLDER',
+                        'ROOT_FOLDER. This helps to prevent conflicts ' +
+                        'between different simulations.',
                         default=False)
 
-    parser.add_argument('-t', '--table', action='store', type=str,
+    group1.add_argument('-t', '--table', action='store', type=str,
                         dest='parametric_table',
                         help='Path to a PARAMETRIC_TABLE file with ' +
                         'replacements to be made in the given deck files. ' +
@@ -734,19 +760,23 @@ def run_OptionParser(TRNExe, dck_proc):
                         'Pass "disabled" to suppress the file dialog.',
                         default=None)
 
-    parser.add_argument('-l', '--log_level', action='store', dest='log_level',
+    group2 = parser.add_argument_group('Advanced options', 'These options ' +
+                                       'do not need to be changed in most ' +
+                                       'cases.')
+
+    group2.add_argument('-l', '--log_level', action='store', dest='log_level',
                         help='LOG_LEVEL can be one of: debug, info, ' +
                         'warning, error or critical',
                         default='info')
 
-    parser.add_argument('--root_folder', action='store',
+    group2.add_argument('--root_folder', action='store',
                         dest='root_folder',
                         help='Folder where new simulations are created in, ' +
                         'if --copy_files is true or PARAMETRIC_TABLE is' +
                         ' given',
                         default=dck_proc.root_folder)
 
-    parser.add_argument('--regex_result_files', action='store',
+    group2.add_argument('--regex_result_files', action='store',
                         dest='regex_result_files',
                         help='We need to separates the input files for your ' +
                         'deck(s) from the output/result files. Please enter ' +
@@ -754,10 +784,16 @@ def run_OptionParser(TRNExe, dck_proc):
                         'result files, regular expressions are supported.',
                         default=dck_proc.regex_result_files)
 
-    parser.add_argument('--path_TRNExe', action='store',
+    group2.add_argument('--path_TRNExe', action='store',
                         dest='path_TRNExe',
-                        help='Path to the TRNExe.exe ',
+                        help='Path to the TRNExe.exe.',
                         default=TRNExe.path_TRNExe)
+
+    group2.add_argument('--n_cores', action='store',
+                        dest='n_cores',
+                        help='Number of CPU cores to use for parallelization' +
+                        '. "0" is for detection of total number minus one.',
+                        default=TRNExe.n_cores)
 
     # Read the user input:
     args = parser.parse_args()
@@ -766,6 +802,7 @@ def run_OptionParser(TRNExe, dck_proc):
     TRNExe.path_TRNExe = args.path_TRNExe
     TRNExe.mode_trnsys_hidden = args.mode_trnsys_hidden
     TRNExe.mode_exec_parallel = args.mode_exec_parallel
+    TRNExe.n_cores = args.n_cores
     dck_proc.root_folder = os.path.abspath(args.root_folder)
     dck_proc.regex_result_files = args.regex_result_files
 
