@@ -778,7 +778,7 @@ def run_OptionParser(TRNExe, dck_proc):
 
     group2.add_argument('--regex_result_files', action='store',
                         dest='regex_result_files',
-                        help='We need to separates the input files for your ' +
+                        help='We need to separate the input files for your ' +
                         'deck(s) from the output/result files. Please enter ' +
                         ' a pattern that only occurs in the file paths of ' +
                         'result files, regular expressions are supported.',
@@ -789,7 +789,7 @@ def run_OptionParser(TRNExe, dck_proc):
                         help='Path to the TRNExe.exe.',
                         default=TRNExe.path_TRNExe)
 
-    group2.add_argument('--n_cores', action='store',
+    group2.add_argument('--n_cores', action='store', type=int,
                         dest='n_cores',
                         help='Number of CPU cores to use for parallelization' +
                         '. "0" is for detection of total number minus one.',
