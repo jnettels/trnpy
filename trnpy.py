@@ -25,6 +25,9 @@ import psutil
 import hashlib
 from tkinter import Tk, filedialog
 
+# Default values that are used by multiple classes:
+regex_result_files_def = r'Results|\.sum|\.pr.'
+
 
 class TRNExe(object):
     '''The TRNExe class.
@@ -113,10 +116,10 @@ class TRNExe(object):
         else:
             return True
 
-    def TRNExe_is_alive(self, pid, interval=1.0):
+    def TRNExe_is_alive(self, pid, interval=5.0):
         '''Check whether or not a particular TRNExe.exe process is alive.
         This status is guessed by measuring its CPU load over the given time
-        interval.
+        interval (in seconds).
         '''
         try:
             # The process might have finished by the time we get to check
@@ -237,7 +240,7 @@ class TRNExe(object):
 class DCK(object):
     '''Deck class.
     '''
-    def __init__(self, file_path, regex_result_files=r'Result|.sum|.prn'):
+    def __init__(self, file_path, regex_result_files=regex_result_files_def):
         self.file_path_orig = file_path
         self.file_path_dest = file_path
         self.file_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -282,7 +285,7 @@ class DCK_processor(object):
     '''Deck processor class.
     '''
     def __init__(self, root_folder=r'C:\Trnsys17\Work\batch',
-                 regex_result_files=r'Result|.sum|.prn'):
+                 regex_result_files=regex_result_files_def):
         self.root_folder = root_folder
         self.regex_result_files = regex_result_files
 
@@ -769,8 +772,8 @@ def run_OptionParser(TRNExe, dck_proc):
                         'warning, error or critical',
                         default='info')
 
-    group2.add_argument('--root_folder', action='store',
-                        dest='root_folder',
+    group2.add_argument('--sim_folder', action='store',
+                        dest='sim_folder',
                         help='Folder where new simulations are created in, ' +
                         'if --copy_files is true or PARAMETRIC_TABLE is' +
                         ' given',
@@ -803,7 +806,7 @@ def run_OptionParser(TRNExe, dck_proc):
     TRNExe.mode_trnsys_hidden = args.mode_trnsys_hidden
     TRNExe.mode_exec_parallel = args.mode_exec_parallel
     TRNExe.n_cores = args.n_cores
-    dck_proc.root_folder = os.path.abspath(args.root_folder)
+    dck_proc.root_folder = os.path.abspath(args.sim_folder)
     dck_proc.regex_result_files = args.regex_result_files
 
     # Define the logging function
@@ -861,3 +864,5 @@ if __name__ == "__main__":
     dck_list = run_OptionParser(trnexe, dck_proc)
     dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
     dck_proc.report_errors(dck_list)
+
+    input('\nPress the enter key to exit.')
