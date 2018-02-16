@@ -107,7 +107,7 @@ class TRNExe(object):
             dck.error_msg_list.append('No logfile found')
             return False
 
-        re_msg = r'Fatal Error.*\n.*\n.*\n\s*(?P<msg>TRNSYS Message.*\n.*)'
+        re_msg = r'Fatal Error.*\n.*\n.*\n.*Message.*\:\ (?P<msg>.*\n.*)'
         match_list = re.findall(re_msg, logfile)
         if match_list:
             for msg in match_list:
@@ -436,6 +436,10 @@ class DCK_processor(object):
         If the optional argument 'update_dest' is True, the destination path
         is updated and based on the 'root_folder'.
         The default False means simulating the deck in the original folder.
+
+        Please make sure that the dck_file_list contains actual paths.
+        If the deck file is in the same folder as the script, the path has
+        to be "./TRNSYS_input_file.dck".
         '''
         dck_list = [DCK(dck_file, regex_result_files=self.regex_result_files)
                     for dck_file in dck_file_list]
