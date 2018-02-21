@@ -26,7 +26,7 @@ import hashlib
 from tkinter import Tk, filedialog
 
 # Default values that are used by multiple classes:
-regex_result_files_def = r'Results|\.sum|\.pr.'
+regex_result_files_def = r'Result|\.sum|\.pr.'
 
 
 class TRNExe(object):
@@ -277,6 +277,12 @@ class DCK(object):
                 self.assigned_files.remove(file)
                 self.result_files.append(file)
 
+        if len(self.result_files) == 0:
+            logging.warning('No result files were identified among the '
+                            'assigned files in the deck '+self.file_name+'. '
+                            'This may cause issues. Is this regular expression'
+                            ' correct? "'+self.regex_result_files+'"')
+
     def get_errors(self):
         return
 
@@ -322,6 +328,7 @@ class DCK_processor(object):
     def read_filetypes(self, filepath, **args):
         '''Read any file type with stored data and return the Pandas DataFrame.
         Wrapper around Pandas' read_excel() and read_csv().
+
         Please note: With 'args', you can pass any (named) parameter down
         to the Pandas functions. The TRNSYS printer adds some useless rows
         at the top and bottom of the file? No problem, just define 'skiprows'
@@ -548,13 +555,16 @@ class DCK_processor(object):
         Instead, you have to provide the function that manages reading the
         files ('read_file_function'). In some cases, it can look like this:
 
-        def read_file_function(result_file_path):
-            return dck_proc.read_filetypes(result_file_path)
+        .. code:: python
 
-        This means that you can utilize the existing read_filetypes(), which
-        can already handle different file types. Please see the docs for
-        read_filetypes() for info about passing over additional arguments to
-        customize it to your needs.
+            def read_file_function(result_file_path):
+                return dck_proc.read_filetypes(result_file_path)
+
+        .. note::
+            This means that you can utilize the existing read_filetypes(),
+            which can already handle different file types. Please see the docs
+            for read_filetypes() for info about passing over additional
+            arguments to customize it to your needs.
 
         Args:
             dck_list (list): A list of DCK objects
@@ -576,22 +586,27 @@ class DCK_processor(object):
                                                 dck.file_path_dest),
                                                 result_file)
                 # Use the provided function to read the file
-                df_new = read_file_function(result_file_path)
+                try:
+                    df_new = read_file_function(result_file_path)
 
-                # Add the 'hash' and all the key, value pairs to the DataFrame
-                df_new['hash'] = [dck.hash]*len(df_new)
-                for key, value in dck.replace_dict.items():
-                    df_new[key] = [value]*len(df_new)
+                    # Add the 'hash' and all the key, value pairs to DataFrame
+                    df_new['hash'] = [dck.hash]*len(df_new)
+                    for key, value in dck.replace_dict.items():
+                        df_new[key] = [value]*len(df_new)
 
-                # Add the DataFrame to the dict of result files
-                if result_file in result_data.keys():
-                    df_old = result_data[result_file]
-                else:
-                    df_old = pd.DataFrame()
-                # Append the old and new df, with a new index.
-                df = pd.concat([df_old, df_new], ignore_index=True)
-                # Add it to the dict
-                result_data[result_file] = df
+                    # Add the DataFrame to the dict of result files
+                    if result_file in result_data.keys():
+                        df_old = result_data[result_file]
+                    else:
+                        df_old = pd.DataFrame()
+                    # Append the old and new df, with a new index.
+                    df = pd.concat([df_old, df_new], ignore_index=True)
+                    # Add it to the dict
+                    result_data[result_file] = df
+
+                except Exception as ex:
+                    logging.error('Error when trying to read result file "' +
+                                  result_file + '": ' + str(ex))
 
         logging.info('Collected result files:')
         if logging.getLogger().isEnabledFor(logging.INFO):
