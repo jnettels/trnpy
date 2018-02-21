@@ -36,6 +36,10 @@ def trnsys_batch_example_01(dck_file):
     # Create a deck list from the parameters and the original deck file
     dck_list = dck_proc.get_parametric_dck_list(param_table, dck_file)
 
+    # Disable the plotters
+    for dck in dck_list:
+        dck_proc.disable_plotters(dck)
+
     # Apply parametric modifications to list of decks
     dck_proc.rewrite_dcks(dck_list)
 
@@ -45,8 +49,8 @@ def trnsys_batch_example_01(dck_file):
     # Create a TRNSYS object
     trnexe = trnpy.TRNExe(
                           mode_exec_parallel=True,
-                          mode_trnsys_hidden=True,
-                          n_cores=7,
+#                          mode_trnsys_hidden=True,
+#                          n_cores=7,
                           )
 
     # Run the TRNSYS simulations
@@ -67,6 +71,8 @@ def trnsys_batch_example_01(dck_file):
                                            skiprows=33,
                                            skipfooter=2,
                                            engine='python')
+        elif 'Speicher.out' in result_file_path:
+            raise ValueError("Skip Speicher.out")
         else:  # All other files can be read automatically
             return dck_proc.read_filetypes(result_file_path)
 
@@ -81,30 +87,33 @@ def trnsys_batch_example_01(dck_file):
 
     # Now we have got all the results in memory. We can call them by their file
     # paths (as assigned in TRNSYS).
-    df_hourly = result_data[r'Result\temperaturen_1.out']
+#    df_hourly = result_data[r'Result\temperaturen_1.out']
 #    print(df_hourly)
 
     # Slicing the index to receive only the last year (since we simulated
     # three identical years in succession).
-#    df_hourly = df_hourly.loc[(slice(None), slice(None), slice(None),
+#    df_hourly = df_hourly.loc[(slice(None), slice(None),
+#                               slice(None),
 #                               slice('2005-01-01', '2006-01-01')), :]
 #    print(df_hourly)
 
     # Now depending on our needs, we can also group the data by week or year
-    df_weekly = dck_proc.results_resample(df_hourly, freq='W')
+#    df_daily = dck_proc.results_resample(df_hourly, freq='D')
+#    df_weekly = dck_proc.results_resample(df_hourly, freq='W')
 #    print(df_weekly)
-    df_monthly = dck_proc.results_resample(df_hourly, freq='M')
+#    df_monthly = dck_proc.results_resample(df_hourly, freq='M')
 #    print(df_monthly)
-    df_year = dck_proc.results_resample(df_hourly, freq='Y')
+#    df_year = dck_proc.results_resample(df_hourly, freq='Y')
 #    print(df_year)
 
     df_energy_1 = result_data[r'Result\simsum_energie_1.out']
     df_energy_2 = result_data[r'Result\simsum_energie_2.out']
     df_energy = pd.concat([df_energy_1, df_energy_2], axis=1)
     df_energy.drop(columns=['Month', 'hash', 'hash.1'], inplace=True)
-#    print(df_energy)
+    print(df_energy)
 
     # With the manipulation completed, we have the option to view the result:
+#    open_in_dataexplorer(dck_proc, df_daily)
 #    open_in_dataexplorer(dck_proc, df_hourly)
 #    open_in_dataexplorer(dck_proc, df_weekly)
 #    open_in_dataexplorer(dck_proc, df_monthly)
@@ -133,7 +142,7 @@ def trnsys_batch_example_02(dck_file_list):
         dck_proc.add_replacements_value_of_key(replace_dict, dck)
 
         # 2) In some places of the file, we just want to replace some strings
-        replace_dict = {'_WP.out"': '.out"',
+        replace_dict = {r'([^P]).out\"': r'\1_WP.out"',
                         }
         dck_proc.add_replacements(replace_dict, dck)
 
@@ -168,7 +177,7 @@ def open_in_dataexplorer(dck_proc, DatEx_df):
     bokeh_app = r'C:\Users\nettelstroth\Documents\07 Python\dataexplorer'
     DatEx_data_name = 'TRNSYS Results'
     DatEx_file_path = os.path.join(bokeh_app, 'upload',
-                                   'TRNSYS_results.xlsx')
+                                   DatEx_data_name + '.xlsx')
 #                                   'TRNSYS_results.csv')
     logging.info('Saving file for DataExplorer... ')
     logging.info(DatEx_file_path)
@@ -179,7 +188,9 @@ def open_in_dataexplorer(dck_proc, DatEx_df):
 
     logging.info('Starting DataExplorer...')
     # Call Bokeh app:
-    main(["bokeh", "serve", bokeh_app, "--show",
+    main(["bokeh", "serve", bokeh_app,
+#          "--show",
+          "--port", "80",
           "--log-level", "warning",
           "--args",
           "--name", DatEx_data_name,
@@ -203,7 +214,7 @@ if __name__ == "__main__":
 #    logging.basicConfig(format=FORMAT, level='ERROR')
 
     dck_file_list = [
-        r'Steinfurt_180105\Steinfurt_180105.dck',
+#        r'Steinfurt_180105\Steinfurt_180105.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test1.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test2.dck',
@@ -227,6 +238,7 @@ if __name__ == "__main__":
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171204.dck',
 #        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171201.dck',
 #        r'C:\Trnsys17\Work\futureSuN\HK\Hannover_Koll_Multi_170222.dck',
+        r'C:\Trnsys17\Work\futureSuN\HK\Hannover_Koll_Multi_180220.dck',
         ]
 
     # This example takes only a single deck file path as input
