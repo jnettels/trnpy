@@ -77,8 +77,8 @@ class TRNExe(object):
         while proc.poll() is None:
             # While we wait, we check if TRNSYS is still running
             if self.TRNExe_is_alive(proc.pid) is False:
-                logging.debug('\nTRNSYS may have encountered an error, ' +
-                              'killing the process in 10 seconds: ' +
+                logging.debug('TRNSYS is inactive and may have encountered '
+                              'an error, killing the process in 10 seconds: ' +
                               dck.file_path_dest)
                 time.sleep(10)
                 proc.terminate()
@@ -116,18 +116,31 @@ class TRNExe(object):
         else:
             return True
 
-    def TRNExe_is_alive(self, pid, interval=5.0):
+    def TRNExe_is_alive(self, pid, interval_1=0.3, interval_2=9.7):
         '''Check whether or not a particular TRNExe.exe process is alive.
         This status is guessed by measuring its CPU load over the given time
-        interval (in seconds).
+        intervals. The first measurement has to be short, because it blocks
+        the thread. If it indicates a low CPU load, the second (longer)
+        measurement is performed to be sure.
+
+        Args:
+            pid (int): Process ID number
+
+            interval_1 (float): First (short) interval in seconds
+
+            interval_2 (float): Second (longer) interval in seconds
+
+        Returns:
+            True/False (bool): Status information
         '''
         try:
             # The process might have finished by the time we get to check
             # its status. This would cause an error.
             p = psutil.Process(pid)
-            if p.cpu_percent(interval=interval) < 1.0:
-                # print(p.memory_info())
-                return False
+            if p.cpu_percent(interval=interval_1) < 0.1:
+                if p.cpu_percent(interval=interval_2) < 0.1:
+                    # print(p.memory_info())
+                    return False
         except Exception:
             pass
 
