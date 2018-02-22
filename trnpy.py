@@ -431,7 +431,7 @@ class DCK_processor(object):
         '''
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
-            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>.*)'
+            re_find = r'(?P<key>\b'+key+'\s?=\s?)(?P<value>.*)'
 #            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>\W*\d*\W?\d*\n)'
             # Replace match with key (capture group) plus the new value
             re_replace = r'\g<key>'+str(value)
