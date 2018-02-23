@@ -6,7 +6,10 @@ TRNpy: Parallelized TRNSYS simulation with Python
 **Setup script for the TRNpy project**
 
 Run with the following command prompt to create a Windows executable:
-`python setup.py build`
+
+.. code::
+
+    python setup.py build
 
 After the build process, the script remove unnecessary folders from the
 resulting folder. This can cause serious issues, but also dramatically
@@ -33,7 +36,9 @@ if 'g' in version:  # 'Dirty' version, does not fit to Windows' version scheme
             version_list.append(str(int(i)))
         except Exception:
             pass
-    if len(version_list) < 4:  # Windows version has a maximum length
+    if len(version_list) < 3:  # Version is X.Y -> make it X.Y.0.1
+        version_list.append('0.1')  # Use this to mark as a dev build
+    elif len(version_list) < 4:  # Windows version has a maximum length
         version_list.append('1')  # Use this to mark as a dev build
     version = '.'.join(version_list)
 
@@ -166,3 +171,6 @@ remove_folders = [
         ]
 for folder in remove_folders:
     shutil.rmtree(folder, ignore_errors=True)
+
+# Copy the README.md file to the build folder, changing extension to .txt
+shutil.copy2(r'.\README.md', r'.\build\exe.win-amd64-3.6\README.txt')
