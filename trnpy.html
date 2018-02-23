@@ -1,0 +1,465 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module trnpy</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>trnpy</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cnettelstroth%5Cdocuments%5C07%20python%5Ctrnpy%5Ctrnpy.py">c:\users\nettelstroth\documents\07 python\trnpy\trnpy.py</a></font></td></tr></table>
+    <p><tt>@author:&nbsp;Joris&nbsp;Nettelstroth<br>
+&nbsp;<br>
+TRNpy:&nbsp;Parallelized&nbsp;TRNSYS&nbsp;simulation&nbsp;with&nbsp;Python<br>
+=================================================<br>
+Simulate&nbsp;TRNSYS&nbsp;deck&nbsp;files&nbsp;in&nbsp;serial&nbsp;or&nbsp;parallel&nbsp;and&nbsp;use&nbsp;parametric&nbsp;tables&nbsp;to<br>
+perform&nbsp;simulations&nbsp;for&nbsp;different&nbsp;sets&nbsp;of&nbsp;parameters.&nbsp;TRNpy&nbsp;helps&nbsp;to&nbsp;automate<br>
+these&nbsp;and&nbsp;similar&nbsp;operations&nbsp;by&nbsp;providing&nbsp;functions&nbsp;to&nbsp;manipulate&nbsp;deck&nbsp;files<br>
+and&nbsp;run&nbsp;TRNSYS&nbsp;simulations&nbsp;from&nbsp;a&nbsp;programmatic&nbsp;level.<br>
+&nbsp;<br>
+&nbsp;<br>
+Usage<br>
+=====<br>
+TRNpy&nbsp;can&nbsp;be&nbsp;used&nbsp;as&nbsp;a&nbsp;standalone&nbsp;application&nbsp;or&nbsp;imported&nbsp;into&nbsp;other&nbsp;Python<br>
+scripts.<br>
+&nbsp;<br>
+Standalone&nbsp;TRNpy<br>
+----------------<br>
+TRNpy&nbsp;can&nbsp;be&nbsp;compiled&nbsp;into&nbsp;a&nbsp;Windows&nbsp;.exe&nbsp;file&nbsp;with&nbsp;the&nbsp;script&nbsp;``setup.py``<br>
+and&nbsp;the&nbsp;following&nbsp;tips&nbsp;are&nbsp;valid&nbsp;for&nbsp;both&nbsp;``trnpy.py``&nbsp;and&nbsp;``trnpy.exe``.<br>
+&nbsp;<br>
+*&nbsp;By&nbsp;double-clicking&nbsp;the&nbsp;program,&nbsp;the&nbsp;main()&nbsp;function&nbsp;of&nbsp;this&nbsp;script&nbsp;is<br>
+&nbsp;&nbsp;executed.&nbsp;It&nbsp;performs&nbsp;the&nbsp;most&nbsp;common&nbsp;tasks&nbsp;possible&nbsp;with&nbsp;this&nbsp;application:<br>
+&nbsp;<br>
+&nbsp;&nbsp;*&nbsp;The&nbsp;first&nbsp;file&nbsp;dialog&nbsp;allows&nbsp;to&nbsp;choose&nbsp;one&nbsp;or&nbsp;multiple&nbsp;deck&nbsp;files&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;simulate.<br>
+&nbsp;&nbsp;*&nbsp;The&nbsp;second&nbsp;file&nbsp;dialog&nbsp;allows&nbsp;to&nbsp;choose&nbsp;a&nbsp;parametric&nbsp;table,&nbsp;which&nbsp;can&nbsp;be<br>
+&nbsp;&nbsp;&nbsp;&nbsp;an&nbsp;Excel&nbsp;or&nbsp;a&nbsp;csv&nbsp;file.&nbsp;The&nbsp;first&nbsp;row&nbsp;must&nbsp;contain&nbsp;names&nbsp;of&nbsp;parameters<br>
+&nbsp;&nbsp;&nbsp;&nbsp;you&nbsp;want&nbsp;to&nbsp;change.&nbsp;The&nbsp;following&nbsp;rows&nbsp;must&nbsp;contain&nbsp;the&nbsp;values&nbsp;of&nbsp;those<br>
+&nbsp;&nbsp;&nbsp;&nbsp;parameters&nbsp;for&nbsp;each&nbsp;simulation&nbsp;you&nbsp;want&nbsp;to&nbsp;perform.&nbsp;TRNpy&nbsp;will&nbsp;make<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;substitutions&nbsp;in&nbsp;the&nbsp;given&nbsp;deck&nbsp;file&nbsp;and&nbsp;perform&nbsp;all&nbsp;the&nbsp;simulations.<br>
+&nbsp;&nbsp;*&nbsp;You&nbsp;can&nbsp;cancel&nbsp;the&nbsp;second&nbsp;dialog&nbsp;to&nbsp;perform&nbsp;regular&nbsp;simulations.<br>
+&nbsp;&nbsp;*&nbsp;The&nbsp;parametric&nbsp;table&nbsp;could&nbsp;look&nbsp;like&nbsp;this,&nbsp;to&nbsp;modify&nbsp;two&nbsp;parameters<br>
+&nbsp;&nbsp;&nbsp;&nbsp;defined&nbsp;in&nbsp;TRNSYS&nbsp;equations:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;===========&nbsp;&nbsp;===========<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Parameter_1&nbsp;&nbsp;Parameter_2<br>
+&nbsp;&nbsp;&nbsp;&nbsp;===========&nbsp;&nbsp;===========<br>
+&nbsp;&nbsp;&nbsp;&nbsp;100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;100&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;200&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;200&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;===========&nbsp;&nbsp;===========<br>
+&nbsp;<br>
+*&nbsp;Running&nbsp;the&nbsp;program&nbsp;from&nbsp;a&nbsp;command&nbsp;line&nbsp;gives&nbsp;you&nbsp;more&nbsp;options,&nbsp;because<br>
+&nbsp;&nbsp;you&nbsp;can&nbsp;use&nbsp;the&nbsp;built-in&nbsp;argument&nbsp;parser:<br>
+&nbsp;<br>
+&nbsp;&nbsp;*&nbsp;Type&nbsp;``python&nbsp;trnsys.py&nbsp;--help``&nbsp;or&nbsp;``trnsys.exe&nbsp;--help``&nbsp;to&nbsp;see&nbsp;the&nbsp;help<br>
+&nbsp;&nbsp;&nbsp;&nbsp;message&nbsp;and&nbsp;an&nbsp;explanation&nbsp;of&nbsp;the&nbsp;available&nbsp;arguments.<br>
+&nbsp;&nbsp;*&nbsp;This&nbsp;allows&nbsp;e.g.&nbsp;to&nbsp;enable&nbsp;parallel&nbsp;computing,&nbsp;hide&nbsp;the&nbsp;TRNSYS&nbsp;windows,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;suppress&nbsp;the&nbsp;parametric&nbsp;table&nbsp;file&nbsp;dialog,&nbsp;define&nbsp;the&nbsp;folder&nbsp;where<br>
+&nbsp;&nbsp;&nbsp;&nbsp;parallel&nbsp;simulations&nbsp;are&nbsp;performed,&nbsp;and&nbsp;some&nbsp;more.<br>
+&nbsp;&nbsp;*&nbsp;Example&nbsp;command:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;..&nbsp;code::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trnpy.exe&nbsp;--parallel&nbsp;--copy_files&nbsp;--n_cores&nbsp;4&nbsp;--table&nbsp;disabled<br>
+&nbsp;<br>
+*&nbsp;Creating&nbsp;a&nbsp;shortcut&nbsp;to&nbsp;the&nbsp;executable&nbsp;is&nbsp;another&nbsp;practical&nbsp;approach:<br>
+&nbsp;<br>
+&nbsp;&nbsp;*&nbsp;Arguments&nbsp;can&nbsp;be&nbsp;appended&nbsp;to&nbsp;the&nbsp;path&nbsp;in&nbsp;the&nbsp;``Target``&nbsp;field<br>
+&nbsp;&nbsp;*&nbsp;Changing&nbsp;the&nbsp;field&nbsp;``Start&nbsp;in``&nbsp;to&nbsp;e.g.&nbsp;``C:\Trnsys17\Work``&nbsp;will&nbsp;always<br>
+&nbsp;&nbsp;&nbsp;&nbsp;open&nbsp;the&nbsp;file&nbsp;dialogs&nbsp;in&nbsp;that&nbsp;folder<br>
+&nbsp;<br>
+Module&nbsp;Import<br>
+-------------<br>
+Import&nbsp;this&nbsp;script&nbsp;as&nbsp;a&nbsp;module&nbsp;into&nbsp;your&nbsp;own&nbsp;Python&nbsp;script.&nbsp;There&nbsp;you&nbsp;can<br>
+initialize&nbsp;objects&nbsp;of&nbsp;the&nbsp;``<a href="#DCK_processor">DCK_processor</a>()``&nbsp;and&nbsp;``<a href="#TRNExe">TRNExe</a>()``&nbsp;classes&nbsp;and&nbsp;use<br>
+their&nbsp;functions.&nbsp;The&nbsp;first&nbsp;can&nbsp;create&nbsp;``dck``&nbsp;objects&nbsp;from&nbsp;regular&nbsp;TRNSYS<br>
+input&nbsp;(deck)&nbsp;files&nbsp;and&nbsp;manipulate&nbsp;them,&nbsp;the&nbsp;latter&nbsp;can&nbsp;run&nbsp;simulations&nbsp;with<br>
+the&nbsp;given&nbsp;``dck``&nbsp;objects.<br>
+This&nbsp;also&nbsp;gives&nbsp;you&nbsp;the&nbsp;option&nbsp;to&nbsp;perform&nbsp;post-processing&nbsp;tasks&nbsp;with<br>
+the&nbsp;simulation&nbsp;results&nbsp;(something&nbsp;that&nbsp;cannot&nbsp;be&nbsp;automated&nbsp;in&nbsp;the&nbsp;standalone<br>
+version).<br>
+&nbsp;<br>
+&nbsp;<br>
+Installation<br>
+============<br>
+&nbsp;<br>
+TRNpy<br>
+-----<br>
+Just&nbsp;save&nbsp;the&nbsp;TRNpy&nbsp;application&nbsp;anywhere.&nbsp;As&nbsp;explained,&nbsp;it&nbsp;makes&nbsp;sense&nbsp;to<br>
+create&nbsp;shortcuts&nbsp;to&nbsp;the&nbsp;executable&nbsp;from&nbsp;your&nbsp;TRNSYS&nbsp;work&nbsp;folders.<br>
+&nbsp;<br>
+Python<br>
+------<br>
+You&nbsp;do&nbsp;not&nbsp;need&nbsp;a&nbsp;Python&nbsp;installation&nbsp;for&nbsp;using&nbsp;``trnpy.exe``.<br>
+&nbsp;<br>
+If&nbsp;you&nbsp;want&nbsp;to&nbsp;use&nbsp;Python&nbsp;but&nbsp;do&nbsp;not&nbsp;yet&nbsp;have&nbsp;it&nbsp;installed,&nbsp;the&nbsp;easiest&nbsp;way&nbsp;to<br>
+do&nbsp;that&nbsp;is&nbsp;by&nbsp;downloading&nbsp;and&nbsp;installing&nbsp;**Anaconda**&nbsp;from&nbsp;here:<br>
+https://www.anaconda.com/download/<br>
+It's&nbsp;a&nbsp;package&nbsp;manager&nbsp;that&nbsp;distributes&nbsp;Python&nbsp;with&nbsp;data&nbsp;science&nbsp;packages.<br>
+&nbsp;<br>
+During&nbsp;installation,&nbsp;please&nbsp;allow&nbsp;to&nbsp;add&nbsp;variables&nbsp;to&nbsp;``$PATH``&nbsp;(or&nbsp;do&nbsp;that<br>
+manually&nbsp;afterwards.)&nbsp;This&nbsp;allows&nbsp;Python&nbsp;to&nbsp;be&nbsp;started&nbsp;via&nbsp;command&nbsp;line&nbsp;from<br>
+every&nbsp;directory,&nbsp;which&nbsp;is&nbsp;very&nbsp;useful.<br>
+&nbsp;<br>
+&nbsp;<br>
+Support<br>
+=======<br>
+For&nbsp;questions&nbsp;and&nbsp;help,&nbsp;contact&nbsp;Joris&nbsp;Nettelstroth.<br>
+If&nbsp;you&nbsp;would&nbsp;like&nbsp;to&nbsp;request&nbsp;or&nbsp;contribute&nbsp;changes,&nbsp;do&nbsp;the&nbsp;same.</tt></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="argparse.html">argparse</a><br>
+<a href="tkinter.filedialog.html">tkinter.filedialog</a><br>
+<a href="hashlib.html">hashlib</a><br>
+</td><td width="25%" valign=top><a href="logging.html">logging</a><br>
+<a href="multiprocessing.html">multiprocessing</a><br>
+<a href="os.html">os</a><br>
+</td><td width="25%" valign=top><a href="pandas.html">pandas</a><br>
+<a href="psutil.html">psutil</a><br>
+<a href="re.html">re</a><br>
+</td><td width="25%" valign=top><a href="shutil.html">shutil</a><br>
+<a href="subprocess.html">subprocess</a><br>
+<a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="builtins.html#object">builtins.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="trnpy.html#DCK">DCK</a>
+</font></dt><dt><font face="helvetica, arial"><a href="trnpy.html#DCK_processor">DCK_processor</a>
+</font></dt><dt><font face="helvetica, arial"><a href="trnpy.html#TRNExe">TRNExe</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="DCK">class <strong>DCK</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Deck&nbsp;class.<br>
+Holds&nbsp;all&nbsp;the&nbsp;information&nbsp;about&nbsp;a&nbsp;deck&nbsp;file,&nbsp;including&nbsp;the&nbsp;content&nbsp;of&nbsp;the<br>
+file&nbsp;itself.&nbsp;This&nbsp;allows&nbsp;manipulating&nbsp;the&nbsp;content,&nbsp;before&nbsp;saving&nbsp;the<br>
+actual&nbsp;file&nbsp;to&nbsp;the&nbsp;old&nbsp;or&nbsp;a&nbsp;new&nbsp;location&nbsp;for&nbsp;simulation.<br>
+These&nbsp;locations&nbsp;are&nbsp;stored,&nbsp;as&nbsp;well&nbsp;as&nbsp;the&nbsp;applied&nbsp;manipulations.<br>
+After&nbsp;a&nbsp;simulation,&nbsp;potential&nbsp;errors&nbsp;can&nbsp;be&nbsp;stored&nbsp;in&nbsp;the&nbsp;<a href="builtins.html#object">object</a>,&nbsp;too.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="DCK-__init__"><strong>__init__</strong></a>(self, file_path, regex_result_files='Result|\\.sum|\\.pr.')</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="DCK-find_assigned_files"><strong>find_assigned_files</strong></a>(self)</dt><dd><tt>Find&nbsp;all&nbsp;file&nbsp;paths&nbsp;that&nbsp;appear&nbsp;after&nbsp;an&nbsp;"ASSIGN"&nbsp;key&nbsp;in&nbsp;the<br>
+deck.&nbsp;The&nbsp;files&nbsp;are&nbsp;sorted&nbsp;into&nbsp;input&nbsp;and&nbsp;output&nbsp;(=result)&nbsp;files&nbsp;by<br>
+applying&nbsp;regex_result_files.<br>
+The&nbsp;results&nbsp;are&nbsp;stored&nbsp;in&nbsp;the&nbsp;lists&nbsp;assigned_files&nbsp;and&nbsp;result_files.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<dl><dt><a name="DCK-load_dck_text"><strong>load_dck_text</strong></a>(self)</dt><dd><tt>Here&nbsp;we&nbsp;store&nbsp;the&nbsp;complete&nbsp;text&nbsp;of&nbsp;the&nbsp;deck&nbsp;file&nbsp;as&nbsp;a&nbsp;property&nbsp;of<br>
+the&nbsp;deck&nbsp;<a href="builtins.html#object">object</a>.<br>
+&nbsp;<br>
+..&nbsp;note::<br>
+&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;may&nbsp;or&nbsp;may&nbsp;not&nbsp;prove&nbsp;to&nbsp;consume&nbsp;too&nbsp;much&nbsp;memory.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="DCK_processor">class <strong>DCK_processor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Deck&nbsp;processor&nbsp;class.<br>
+Create&nbsp;``dck``&nbsp;objects&nbsp;from&nbsp;regular&nbsp;TRNSYS&nbsp;input&nbsp;(deck)&nbsp;files&nbsp;and<br>
+manipulate&nbsp;them.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="DCK_processor-__init__"><strong>__init__</strong></a>(self, root_folder='C:\\Trnsys17\\Work\\batch', regex_result_files='Result|\\.sum|\\.pr.')</dt><dd><tt>Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-add_replacements"><strong>add_replacements</strong></a>(self, replace_dict_new, dck)</dt><dd><tt>Add&nbsp;new&nbsp;entries&nbsp;to&nbsp;the&nbsp;existing&nbsp;replace_dict.<br>
+Basic&nbsp;use&nbsp;is&nbsp;to&nbsp;add&nbsp;strings,&nbsp;but&nbsp;also&nbsp;accepts&nbsp;regular&nbsp;expressions.<br>
+These&nbsp;allow&nbsp;you&nbsp;to&nbsp;replace&nbsp;any&nbsp;kind&nbsp;of&nbsp;information.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;replace_dict_new&nbsp;(dict):&nbsp;Dictionary&nbsp;of&nbsp;'str_old:&nbsp;string_new'&nbsp;pairs<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-add_replacements_value_of_key"><strong>add_replacements_value_of_key</strong></a>(self, replace_dict_new, dck)</dt><dd><tt>Add&nbsp;new&nbsp;entries&nbsp;to&nbsp;the&nbsp;existing&nbsp;replace_dict.<br>
+Creates&nbsp;the&nbsp;required&nbsp;regular&nbsp;expression&nbsp;to&nbsp;replace&nbsp;the&nbsp;'value'&nbsp;of&nbsp;the<br>
+'key'&nbsp;in&nbsp;the&nbsp;deck&nbsp;file.&nbsp;Then&nbsp;calls&nbsp;<a href="#DCK_processor-add_replacements">add_replacements</a>().<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;replace_dict_new&nbsp;(dict):&nbsp;Dictionary&nbsp;of&nbsp;'key:&nbsp;value'&nbsp;pairs<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Example:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;replace_dict_new&nbsp;=&nbsp;{'A_Koll':&nbsp;550,&nbsp;'plot_on_off':&nbsp;-1}</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-auto_parametric_table"><strong>auto_parametric_table</strong></a>(self, parametric_table, dck_file_list)</dt></dl>
+
+<dl><dt><a name="DCK_processor-copy_assigned_files"><strong>copy_assigned_files</strong></a>(self, dck_list)</dt><dd><tt>All&nbsp;external&nbsp;files&nbsp;that&nbsp;a&nbsp;TRNSYS&nbsp;deck&nbsp;depends&nbsp;on&nbsp;are&nbsp;stored&nbsp;with<br>
+the&nbsp;ASSIGN&nbsp;parameter.&nbsp;We&nbsp;make&nbsp;a&nbsp;list&nbsp;of&nbsp;those&nbsp;files&nbsp;and&nbsp;copy&nbsp;them<br>
+to&nbsp;the&nbsp;required&nbsp;location.&nbsp;(Weather&nbsp;data,&nbsp;load&nbsp;profiles,&nbsp;etc.)</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-create_dcks_from_file_list"><strong>create_dcks_from_file_list</strong></a>(self, dck_file_list, update_dest=False)</dt><dd><tt>Takes&nbsp;a&nbsp;list&nbsp;of&nbsp;file&nbsp;paths&nbsp;and&nbsp;creates&nbsp;deck&nbsp;objects&nbsp;for&nbsp;each&nbsp;one.<br>
+If&nbsp;the&nbsp;optional&nbsp;argument&nbsp;'update_dest'&nbsp;is&nbsp;True,&nbsp;the&nbsp;destination&nbsp;path<br>
+is&nbsp;updated&nbsp;and&nbsp;based&nbsp;on&nbsp;the&nbsp;'root_folder'.<br>
+The&nbsp;default&nbsp;False&nbsp;means&nbsp;simulating&nbsp;the&nbsp;deck&nbsp;in&nbsp;the&nbsp;original&nbsp;folder.<br>
+&nbsp;<br>
+Please&nbsp;make&nbsp;sure&nbsp;that&nbsp;the&nbsp;dck_file_list&nbsp;contains&nbsp;actual&nbsp;paths.<br>
+If&nbsp;the&nbsp;deck&nbsp;file&nbsp;is&nbsp;in&nbsp;the&nbsp;same&nbsp;folder&nbsp;as&nbsp;the&nbsp;script,&nbsp;the&nbsp;path&nbsp;has<br>
+to&nbsp;be&nbsp;"./TRNSYS_input_file.dck".</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-disable_plotters"><strong>disable_plotters</strong></a>(self, dck)</dt><dd><tt>Disable&nbsp;the&nbsp;plotters&nbsp;by&nbsp;setting&nbsp;their&nbsp;parameter&nbsp;9&nbsp;to&nbsp;'-1'.<br>
+Calls&nbsp;<a href="#DCK_processor-add_replacements">add_replacements</a>()&nbsp;with&nbsp;the&nbsp;required&nbsp;regular&nbsp;expressions.</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-gen_row_hash"><strong>gen_row_hash</strong></a>(self)</dt><dd><tt>Unused</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-get_parametric_dck_list"><strong>get_parametric_dck_list</strong></a>(self, parametric_table, dck_file)</dt></dl>
+
+<dl><dt><a name="DCK_processor-mark_index_for_DataExplorer"><strong>mark_index_for_DataExplorer</strong></a>(self, df)</dt><dd><tt>Put&nbsp;'!'&nbsp;in&nbsp;front&nbsp;of&nbsp;index&nbsp;column&nbsp;names,&nbsp;to&nbsp;mark&nbsp;them&nbsp;as<br>
+classifications.&nbsp;Is&nbsp;not&nbsp;applied&nbsp;to&nbsp;time&nbsp;columns.</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-read_filetypes"><strong>read_filetypes</strong></a>(self, filepath, **args)</dt><dd><tt>Read&nbsp;any&nbsp;file&nbsp;type&nbsp;with&nbsp;stored&nbsp;data&nbsp;and&nbsp;return&nbsp;the&nbsp;Pandas&nbsp;DataFrame.<br>
+Wrapper&nbsp;around&nbsp;Pandas'&nbsp;read_excel()&nbsp;and&nbsp;read_csv().<br>
+&nbsp;<br>
+Please&nbsp;note:&nbsp;With&nbsp;'args',&nbsp;you&nbsp;can&nbsp;pass&nbsp;any&nbsp;(named)&nbsp;parameter&nbsp;down<br>
+to&nbsp;the&nbsp;Pandas&nbsp;functions.&nbsp;The&nbsp;TRNSYS&nbsp;printer&nbsp;adds&nbsp;some&nbsp;useless&nbsp;rows<br>
+at&nbsp;the&nbsp;top&nbsp;and&nbsp;bottom&nbsp;of&nbsp;the&nbsp;file?&nbsp;No&nbsp;problem,&nbsp;just&nbsp;define&nbsp;'skiprows'<br>
+and&nbsp;'skipfooter'.&nbsp;For&nbsp;all&nbsp;options,&nbsp;see:<br>
+<a href="http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html">http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html</a></tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-read_parametric_table"><strong>read_parametric_table</strong></a>(self, param_table_file)</dt></dl>
+
+<dl><dt><a name="DCK_processor-report_errors"><strong>report_errors</strong></a>(self, dck_list)</dt></dl>
+
+<dl><dt><a name="DCK_processor-reset_replacements"><strong>reset_replacements</strong></a>(self, dck)</dt><dd><tt>Reset&nbsp;the&nbsp;replace_dict&nbsp;to&nbsp;make&nbsp;it&nbsp;empty.</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-results_collect"><strong>results_collect</strong></a>(self, dck_list, read_file_function, create_index=True)</dt><dd><tt>Collect&nbsp;the&nbsp;results&nbsp;of&nbsp;the&nbsp;simulations.&nbsp;Our&nbsp;goal&nbsp;is&nbsp;to&nbsp;combine<br>
+the&nbsp;result&nbsp;files&nbsp;of&nbsp;the&nbsp;parametric&nbsp;runs&nbsp;into&nbsp;DataFrames.&nbsp;The&nbsp;DataFrames<br>
+contain&nbsp;the&nbsp;raw&nbsp;data&nbsp;plus&nbsp;columns&nbsp;for&nbsp;each&nbsp;of&nbsp;the&nbsp;replacements&nbsp;made<br>
+in&nbsp;the&nbsp;deck&nbsp;files.&nbsp;This&nbsp;allows&nbsp;you&nbsp;to&nbsp;identify&nbsp;each&nbsp;parametric&nbsp;run.<br>
+&nbsp;<br>
+The&nbsp;assumption&nbsp;is&nbsp;that&nbsp;all&nbsp;simulations&nbsp;produced&nbsp;the&nbsp;same&nbsp;set&nbsp;of&nbsp;result<br>
+files.&nbsp;The&nbsp;dict&nbsp;'result_data'&nbsp;will&nbsp;have&nbsp;one&nbsp;DataFrame&nbsp;for&nbsp;each&nbsp;file<br>
+name.&nbsp;In&nbsp;order&nbsp;for&nbsp;this&nbsp;to&nbsp;work,&nbsp;the&nbsp;TRNSYS&nbsp;out&nbsp;files&nbsp;have&nbsp;to&nbsp;be&nbsp;read<br>
+in&nbsp;and&nbsp;converted&nbsp;into&nbsp;Pandas&nbsp;DataFrames.&nbsp;And&nbsp;different&nbsp;TRNSYS&nbsp;printer<br>
+types&nbsp;format&nbsp;their&nbsp;output&nbsp;in&nbsp;different&nbsp;ways.&nbsp;Therefore&nbsp;there&nbsp;can&nbsp;be<br>
+no&nbsp;fully&nbsp;automated&nbsp;reading&nbsp;of&nbsp;all&nbsp;TRNSYS&nbsp;results.<br>
+&nbsp;<br>
+Instead,&nbsp;you&nbsp;have&nbsp;to&nbsp;provide&nbsp;the&nbsp;function&nbsp;that&nbsp;manages&nbsp;reading&nbsp;the<br>
+files&nbsp;('read_file_function').&nbsp;In&nbsp;some&nbsp;cases,&nbsp;it&nbsp;can&nbsp;look&nbsp;like&nbsp;this:<br>
+&nbsp;<br>
+..&nbsp;code::&nbsp;python<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;def&nbsp;read_file_function(result_file_path):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;dck_proc.<a href="#DCK_processor-read_filetypes">read_filetypes</a>(result_file_path)<br>
+&nbsp;<br>
+..&nbsp;note::<br>
+&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;means&nbsp;that&nbsp;you&nbsp;can&nbsp;utilize&nbsp;the&nbsp;existing&nbsp;<a href="#DCK_processor-read_filetypes">read_filetypes</a>(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;which&nbsp;can&nbsp;already&nbsp;handle&nbsp;different&nbsp;file&nbsp;types.&nbsp;Please&nbsp;see&nbsp;the&nbsp;docs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;<a href="#DCK_processor-read_filetypes">read_filetypes</a>()&nbsp;for&nbsp;info&nbsp;about&nbsp;passing&nbsp;over&nbsp;additional<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arguments&nbsp;to&nbsp;customize&nbsp;it&nbsp;to&nbsp;your&nbsp;needs.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_list&nbsp;(list):&nbsp;A&nbsp;list&nbsp;of&nbsp;<a href="#DCK">DCK</a>&nbsp;objects<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;read_file_function&nbsp;(func):&nbsp;A&nbsp;function&nbsp;that&nbsp;takes&nbsp;one&nbsp;argument&nbsp;(a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;file&nbsp;path)&nbsp;and&nbsp;returns&nbsp;a&nbsp;Pandas&nbsp;DataFrame.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;create_index&nbsp;(bool,&nbsp;optional):&nbsp;Move&nbsp;time&nbsp;and&nbsp;parameter&nbsp;columns&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;DataFrame.&nbsp;Default:&nbsp;True<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result_data&nbsp;(dict):&nbsp;A&nbsp;dictionary&nbsp;with&nbsp;one&nbsp;DataFrame&nbsp;for&nbsp;each&nbsp;file</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-results_create_index"><strong>results_create_index</strong></a>(self, result_data, replace_dict, origin)</dt><dd><tt>Put&nbsp;the&nbsp;time&nbsp;and&nbsp;parameter&nbsp;columns&nbsp;into&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;DataFrame.<br>
+The&nbsp;function&nbsp;expects&nbsp;the&nbsp;return&nbsp;of&nbsp;<a href="#DCK_processor-results_collect">results_collect</a>().&nbsp;This&nbsp;typically<br>
+creates&nbsp;a&nbsp;multi-index&nbsp;and&nbsp;is&nbsp;arguably&nbsp;how&nbsp;DataFrames&nbsp;are&nbsp;supposed&nbsp;to<br>
+be&nbsp;handled.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result_data&nbsp;(dict):&nbsp;The&nbsp;return&nbsp;of&nbsp;the&nbsp;function&nbsp;<a href="#DCK_processor-results_collect">results_collect</a>()<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;replace_dict&nbsp;(dict):&nbsp;Is&nbsp;required&nbsp;to&nbsp;identify&nbsp;the&nbsp;parameter&nbsp;columns<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;origin&nbsp;(str):&nbsp;Start&nbsp;date,&nbsp;e.g.&nbsp;'2003-01-01'.&nbsp;TRNSYS&nbsp;does&nbsp;not&nbsp;care<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;years&nbsp;or&nbsp;days,&nbsp;but&nbsp;to&nbsp;get&nbsp;a&nbsp;pretty&nbsp;DataFrame&nbsp;we&nbsp;use&nbsp;datetime<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;the&nbsp;time&nbsp;column,&nbsp;which&nbsp;needs&nbsp;a&nbsp;fully&nbsp;defined&nbsp;date.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result_data&nbsp;(dict):&nbsp;A&nbsp;dictionary&nbsp;with&nbsp;one&nbsp;DataFrame&nbsp;for&nbsp;each&nbsp;file</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-results_resample"><strong>results_resample</strong></a>(self, df, freq)</dt><dd><tt>Resample&nbsp;a&nbsp;multi-indexed&nbsp;DataFrame&nbsp;to&nbsp;a&nbsp;new&nbsp;frequency.<br>
+Expects&nbsp;the&nbsp;time&nbsp;column&nbsp;to&nbsp;be&nbsp;at&nbsp;last&nbsp;position&nbsp;in&nbsp;the&nbsp;multi-index.</tt></dd></dl>
+
+<dl><dt><a name="DCK_processor-rewrite_dcks"><strong>rewrite_dcks</strong></a>(self, dck_list)</dt><dd><tt>Perform&nbsp;the&nbsp;replacements&nbsp;in&nbsp;self.<strong>replace_dict</strong>&nbsp;in&nbsp;the&nbsp;deck&nbsp;files.<br>
+You&nbsp;have&nbsp;to&nbsp;use&nbsp;<a href="#DCK_processor-add_replacements">add_replacements</a>(),&nbsp;<a href="#DCK_processor-add_replacements_value_of_key">add_replacements_value_of_key</a>()<br>
+or&nbsp;<a href="#DCK_processor-disable_plotters">disable_plotters</a>()&nbsp;before,&nbsp;to&nbsp;fill&nbsp;the&nbsp;replace_dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_list&nbsp;(list):&nbsp;List&nbsp;of&nbsp;paths&nbsp;to&nbsp;deck&nbsp;files&nbsp;to&nbsp;work&nbsp;on<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_list&nbsp;(list):&nbsp;List&nbsp;of&nbsp;paths</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="TRNExe">class <strong>TRNExe</strong></a>(<a href="builtins.html#object">builtins.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>The&nbsp;<a href="#TRNExe">TRNExe</a>&nbsp;class.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="TRNExe-TRNExe_is_alive"><strong>TRNExe_is_alive</strong></a>(self, pid, interval_1=0.3, interval_2=9.7)</dt><dd><tt>Check&nbsp;whether&nbsp;or&nbsp;not&nbsp;a&nbsp;particular&nbsp;<a href="#TRNExe">TRNExe</a>.exe&nbsp;process&nbsp;is&nbsp;alive.<br>
+This&nbsp;status&nbsp;is&nbsp;guessed&nbsp;by&nbsp;measuring&nbsp;its&nbsp;CPU&nbsp;load&nbsp;over&nbsp;the&nbsp;given&nbsp;time<br>
+intervals.&nbsp;The&nbsp;first&nbsp;measurement&nbsp;has&nbsp;to&nbsp;be&nbsp;short,&nbsp;because&nbsp;it&nbsp;blocks<br>
+the&nbsp;thread.&nbsp;If&nbsp;it&nbsp;indicates&nbsp;a&nbsp;low&nbsp;CPU&nbsp;load,&nbsp;the&nbsp;second&nbsp;(longer)<br>
+measurement&nbsp;is&nbsp;performed&nbsp;to&nbsp;be&nbsp;sure.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pid&nbsp;(int):&nbsp;Process&nbsp;ID&nbsp;number<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;interval_1&nbsp;(float):&nbsp;First&nbsp;(short)&nbsp;interval&nbsp;in&nbsp;seconds<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;interval_2&nbsp;(float):&nbsp;Second&nbsp;(longer)&nbsp;interval&nbsp;in&nbsp;seconds<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True/False&nbsp;(bool):&nbsp;Status&nbsp;information</tt></dd></dl>
+
+<dl><dt><a name="TRNExe-__init__"><strong>__init__</strong></a>(self, path_TRNExe='C:\\Trnsys17\\Exe\\TRNExe.exe', mode_trnsys_hidden=False, mode_exec_parallel=False, n_cores=0)</dt><dd><tt>The&nbsp;optional&nbsp;argument&nbsp;n_cores&nbsp;allows&nbsp;control&nbsp;over&nbsp;the&nbsp;used&nbsp;CPU&nbsp;cores.<br>
+By&nbsp;default,&nbsp;the&nbsp;total&nbsp;number&nbsp;of&nbsp;CPU&nbsp;cores&nbsp;minus&nbsp;one&nbsp;are&nbsp;used.&nbsp;This&nbsp;way<br>
+your&nbsp;CPU&nbsp;is&nbsp;not&nbsp;under&nbsp;100%&nbsp;load&nbsp;-&nbsp;and&nbsp;using&nbsp;all&nbsp;cores&nbsp;does&nbsp;not<br>
+necessarily&nbsp;make&nbsp;total&nbsp;simulation&nbsp;time&nbsp;faster.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_cores&nbsp;(int,&nbsp;optional):&nbsp;Number&nbsp;of&nbsp;CPU&nbsp;cores&nbsp;to&nbsp;use<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<dl><dt><a name="TRNExe-check_log_for_errors"><strong>check_log_for_errors</strong></a>(self, dck)</dt><dd><tt>Stores&nbsp;errors&nbsp;in&nbsp;error_msg_list.&nbsp;Returns&nbsp;False&nbsp;if&nbsp;errors&nbsp;are&nbsp;found.</tt></dd></dl>
+
+<dl><dt><a name="TRNExe-print_progress"><strong>print_progress</strong></a>(self, map_result, start_time)</dt><dd><tt>Prints&nbsp;info&nbsp;about&nbsp;the&nbsp;multiprocessing&nbsp;progress&nbsp;to&nbsp;the&nbsp;screen.<br>
+Measures&nbsp;and&nbsp;prints&nbsp;the&nbsp;percentage&nbsp;of&nbsp;simulations&nbsp;done&nbsp;and&nbsp;an<br>
+estimation&nbsp;of&nbsp;the&nbsp;remaining&nbsp;time.<br>
+The&nbsp;parameter&nbsp;'map_result'&nbsp;must&nbsp;be&nbsp;the&nbsp;return&nbsp;of&nbsp;a&nbsp;pool.map_async()<br>
+function.&nbsp;Please&nbsp;be&nbsp;aware&nbsp;that&nbsp;this&nbsp;mapping&nbsp;splits&nbsp;the&nbsp;work&nbsp;list&nbsp;into<br>
+'chunks'.&nbsp;'map_result._number_left'&nbsp;only&nbsp;updates&nbsp;once&nbsp;one&nbsp;chunk&nbsp;has<br>
+been&nbsp;completed.&nbsp;Therefore&nbsp;the&nbsp;progress&nbsp;percentage&nbsp;does&nbsp;not&nbsp;necessarily<br>
+update&nbsp;after&nbsp;every&nbsp;finished&nbsp;TRNSYS&nbsp;simulation.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;map_result&nbsp;(map_async&nbsp;<a href="builtins.html#object">object</a>):&nbsp;Return&nbsp;of&nbsp;'pool.map_async'<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;start_time&nbsp;(time):&nbsp;Simulation&nbsp;start&nbsp;time<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None</tt></dd></dl>
+
+<dl><dt><a name="TRNExe-run_TRNSYS_dck"><strong>run_TRNSYS_dck</strong></a>(self, dck)</dt><dd><tt>Run&nbsp;a&nbsp;TRNSYS&nbsp;simulation&nbsp;with&nbsp;the&nbsp;given&nbsp;deck&nbsp;dck_file.</tt></dd></dl>
+
+<dl><dt><a name="TRNExe-run_TRNSYS_dck_list"><strong>run_TRNSYS_dck_list</strong></a>(self, dck_list)</dt><dd><tt>Run&nbsp;one&nbsp;TRNSYS&nbsp;simulation&nbsp;of&nbsp;each&nbsp;deck&nbsp;file&nbsp;in&nbsp;the&nbsp;dck_list.<br>
+This&nbsp;is&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;<a href="#TRNExe-run_TRNSYS_dck">run_TRNSYS_dck</a>()&nbsp;that&nbsp;allows&nbsp;execution&nbsp;in<br>
+serial&nbsp;and&nbsp;in&nbsp;parallel.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_list&nbsp;(list):&nbsp;List&nbsp;of&nbsp;<a href="#DCK">DCK</a>&nbsp;objects&nbsp;to&nbsp;work&nbsp;on<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;returned_dck_list&nbsp;(list):&nbsp;List&nbsp;of&nbsp;<a href="#DCK">DCK</a>&nbsp;objects&nbsp;worked&nbsp;on</tt></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-file_dialog_dck"><strong>file_dialog_dck</strong></a>(initialdir='C:\\Users\\nettelstroth\\Documents\\07 Python\\trnpy')</dt><dd><tt>This&nbsp;function&nbsp;presents&nbsp;a&nbsp;file&nbsp;dialog&nbsp;for&nbsp;one&nbsp;or&nbsp;more&nbsp;TRNSYS&nbsp;deck&nbsp;files.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Return:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;paths&nbsp;(List):&nbsp;List&nbsp;of&nbsp;file&nbsp;paths</tt></dd></dl>
+ <dl><dt><a name="-file_dialog_parametrics"><strong>file_dialog_parametrics</strong></a>(initialdir='C:\\Users\\nettelstroth\\Documents\\07 Python\\trnpy')</dt><dd><tt>This&nbsp;function&nbsp;presents&nbsp;a&nbsp;file&nbsp;dialog&nbsp;fora&nbsp;parametric&nbsp;table&nbsp;file.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None<br>
+&nbsp;<br>
+Return:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path&nbsp;(str):&nbsp;File&nbsp;path</tt></dd></dl>
+ <dl><dt><a name="-run_OptionParser"><strong>run_OptionParser</strong></a>(TRNExe, dck_proc)</dt><dd><tt>Define&nbsp;and&nbsp;run&nbsp;the&nbsp;option&nbsp;parser.&nbsp;Set&nbsp;the&nbsp;user&nbsp;input&nbsp;and&nbsp;return&nbsp;the&nbsp;list<br>
+of&nbsp;decks.&nbsp;Needs&nbsp;<a href="#TRNExe">TRNExe</a>&nbsp;and&nbsp;dck_proc&nbsp;to&nbsp;get&nbsp;and&nbsp;set&nbsp;the&nbsp;option&nbsp;values.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#TRNExe">TRNExe</a>&nbsp;(<a href="#TRNExe">TRNExe</a>&nbsp;<a href="builtins.html#object">object</a>):&nbsp;An&nbsp;instance&nbsp;of&nbsp;the&nbsp;<a href="#TRNExe">TRNExe</a>&nbsp;class<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_proc&nbsp;(<a href="#DCK_processor">DCK_processor</a>&nbsp;<a href="builtins.html#object">object</a>):&nbsp;An&nbsp;instance&nbsp;of&nbsp;the&nbsp;<a href="#DCK_processor">DCK_processor</a>&nbsp;class<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dck_list&nbsp;(list):&nbsp;A&nbsp;list&nbsp;of&nbsp;dck&nbsp;objects</tt></dd></dl>
+</td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#55aa55">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Data</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#55aa55"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><strong>regex_result_files_def</strong> = r'Result|\.sum|\.pr.'</td></tr></table>
+</body></html>
