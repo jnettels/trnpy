@@ -1,16 +1,30 @@
+# -*- coding: utf-8 -*-
 '''
-Setup script for the TRNpy project.
+TRNpy: Parallelized TRNSYS simulation with Python
+=================================================
+
+**Setup script for the TRNpy project**
 
 Run with the following command prompt to create a Windows executable:
-python setup.py build
+`python setup.py build`
+
+After the build process, the script remove unnecessary folders from the
+resulting folder. This can cause serious issues, but also dramatically
+decreases the folder size.
 '''
+
 from setuptools_scm import get_version
 from cx_Freeze import setup, Executable
 import os
 import shutil
 
 
-version = get_version(version_scheme='post-release')
+try:
+    version = get_version(version_scheme='post-release')
+except LookupError:
+    version = '0.0.0.0'
+    print('Warning: setuptools-scm requires an intact git repository to detect'
+          ' the version number for this build.')
 
 if 'g' in version:  # 'Dirty' version, does not fit to Windows' version scheme
     version_list = []
@@ -38,10 +52,8 @@ setup(
     executables=[Executable('trnpy.py', base=None, icon='res/icon.ico')],
 )
 
-'''
-Remove unnecessary folders from the resulting build. This can cause serious
-issues, but also dramatically decreases the folder size.
-'''
+
+# Remove unnecessary folders from the resulting build
 keep_folders = [
 #        r'.\build\exe.win-amd64-3.6\lib\adodbapi',
 #        r'.\build\exe.win-amd64-3.6\lib\alabaster',
