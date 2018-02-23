@@ -1,9 +1,25 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jan  5 18:01:41 2018
+'''
+TRNpy: Parallelized TRNSYS simulation with Python
+=================================================
 
-@author: nettelstroth
-"""
+**Examples for Python integration**
+
+By importing trnpy.py as a module into your own Python script, you get full
+control over its functions and can integrate it into your workflow. This
+approach also allows you to (to some degree) automatically collect, combine
+and evaluate the simulation results.
+
+You can initialize objects of the ``DCK_processor()`` and ``TRNExe()`` classes
+and use their functions. The first can create ``dck`` objects from regular
+TRNSYS input (deck) files and manipulate them, the latter can run simulations
+with the given ``dck`` objects.
+
+Post-processing of the results is possible, but will always require adaptions
+for your specific situation.
+
+'''
+
 import logging
 import os
 import trnpy
@@ -150,7 +166,7 @@ def trnsys_batch_example_02(dck_file_list):
         dck_proc.disable_plotters(dck)
 
     # Internally, each dck has stored all those modifications.
-    # Now we tell him to actually rewrite the content of the deck files
+    # Now we rewrite the content of the deck files
     dck_proc.rewrite_dcks(dck_list)
 
     # We copy the decks to their new destination:
@@ -208,10 +224,9 @@ if __name__ == "__main__":
     pd.set_option('display.max_columns', 0)
 
     # Define the logging function
-    FORMAT = '%(asctime)-15s %(message)s'
-    logging.basicConfig(format=FORMAT, level='DEBUG')
-#    logging.basicConfig(format=FORMAT, level='INFO')
-#    logging.basicConfig(format=FORMAT, level='ERROR')
+    logging.basicConfig(format='%(asctime)-15s %(message)s', level='DEBUG')
+#    logging.basicConfig(format='%(asctime)-15s %(message)s', level='INFO')
+#    logging.basicConfig(format='%(asctime)-15s %(message)s', level='ERROR')
 
     dck_file_list = [
 #        r'Steinfurt_180105\Steinfurt_180105.dck',
