@@ -1,16 +1,108 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mo Jan  8 08:07:52 2018
-
+'''
 @author: Joris Nettelstroth
 
-Two use cases are possible:
-    1) Run this script from the command line. The main function is called,
-       which uses the option parser for the user input.
-       Type 'python trnsys.py --help' to see the help message and the options.
-    2) Import this script as a module into your own Python script. There you
-       can initialize an object of the TRNExe() class and use its functions
-"""
+TRNpy: Parallelized TRNSYS simulation with Python
+=================================================
+Simulate TRNSYS deck files in serial or parallel and use parametric tables to
+perform simulations for different sets of parameters. TRNpy helps to automate
+these and similar operations by providing functions to manipulate deck files
+and run TRNSYS simulations from a programmatic level.
+
+
+Usage
+=====
+TRNpy can be used as a standalone application or imported into other Python
+scripts.
+
+Standalone TRNpy
+----------------
+TRNpy can be compiled into a Windows .exe file with the script ``setup.py``
+and the following tips are valid for both ``trnpy.py`` and ``trnpy.exe``.
+
+* By double-clicking the program, the main() function of this script is
+  executed. It performs the most common tasks possible with this application:
+
+  * The first file dialog allows to choose one or multiple deck files to
+    simulate.
+  * The second file dialog allows to choose a parametric table, which can be
+    an Excel or a csv file. The first row must contain names of parameters
+    you want to change. The following rows must contain the values of those
+    parameters for each simulation you want to perform. TRNpy will make
+    the substitutions in the given deck file and perform all the simulations.
+  * You can cancel the second dialog to perform regular simulations.
+  * The parametric table could look like this, to modify two parameters
+    defined in TRNSYS equations:
+
+    ===========  ===========
+    Parameter_1  Parameter_2
+    ===========  ===========
+    100          0
+    100          1
+    200          0
+    200          1
+    ===========  ===========
+
+* Running the program from a command line gives you more options, because
+  you can use the built-in argument parser:
+
+  * Type ``python trnsys.py --help`` or ``trnsys.exe --help`` to see the help
+    message and an explanation of the available arguments.
+  * This allows e.g. to enable parallel computing, hide the TRNSYS windows,
+    suppress the parametric table file dialog, define the folder where
+    parallel simulations are performed, and some more.
+  * Example command:
+
+    .. code::
+
+        trnpy.exe --parallel --copy_files --n_cores 4 --table disabled
+
+* Creating a shortcut to the executable is another practical approach:
+
+  * Arguments can be appended to the path in the ``Target`` field
+  * Changing the field ``Start in`` to e.g. ``C:\Trnsys17\Work`` will always
+    open the file dialogs in that folder
+
+Module Import
+-------------
+Import this script as a module into your own Python script. There you can
+initialize objects of the ``DCK_processor()`` and ``TRNExe()`` classes and use
+their functions. The first can create ``dck`` objects from regular TRNSYS
+input (deck) files and manipulate them, the latter can run simulations with
+the given ``dck`` objects.
+This also gives you the option to perform post-processing tasks with
+the simulation results (something that cannot be automated in the standalone
+version).
+
+
+Installation
+============
+
+TRNpy
+-----
+Just save the TRNpy application anywhere. As explained, it makes sense to
+create shortcuts to the executable from your TRNSYS work folders.
+
+Python
+------
+You do not need a Python installation for using ``trnpy.exe``.
+
+If you want to use Python but do not yet have it installed, the easiest way to
+do that is by downloading and installing **Anaconda** from here:
+https://www.anaconda.com/download/
+It's a package manager that distributes Python with data science packages.
+
+During installation, please allow to add variables to ``$PATH`` (or do that
+manually afterwards.) This allows Python to be started via command line from
+every directory, which is very useful.
+
+
+Support
+=======
+For questions and help, contact Joris Nettelstroth.
+If you would like to request or contribute changes, do the same.
+
+'''
 
 import argparse
 import logging
@@ -252,6 +344,11 @@ class TRNExe(object):
 
 class DCK(object):
     '''Deck class.
+    Holds all the information about a deck file, including the content of the
+    file itself. This allows manipulating the content, before saving the
+    actual file to the old or a new location for simulation.
+    These locations are stored, as well as the applied manipulations.
+    After a simulation, potential errors can be stored in the object, too.
     '''
     def __init__(self, file_path, regex_result_files=regex_result_files_def):
         self.file_path_orig = file_path
@@ -263,8 +360,6 @@ class DCK(object):
         self.replace_dict = dict()
         self.regex_dict = dict()
         self.regex_result_files = regex_result_files
-        self.assigned_files = []
-        self.result_files = []
         self.dck_text = ''
 
         # Perform the following functions to initialize some more values
@@ -274,16 +369,39 @@ class DCK(object):
     def load_dck_text(self):
         '''Here we store the complete text of the deck file as a property of
         the deck object.
-        HINT: This may or may not prove to consume too much memory.
+
+        .. note::
+            This may or may not prove to consume too much memory.
+
+        Args:
+            None
+
+        Returns:
+            None
         '''
         if os.path.splitext(self.file_path_orig)[1] != '.dck':
             msg = self.file_path_orig+' has the wrong file type, must be .dck'
             raise ValueError(msg)
         else:
-            with open(self.file_path_orig, 'r') as f:
+            # Deck files are not saved as UTF-8 by TRNSYS, so reading them
+            # can cause problems. The following helps to prevent issues:
+            with open(self.file_path_orig, 'r', encoding="WINDOWS-1252") as f:
                 self.dck_text = f.read()
 
     def find_assigned_files(self):
+        '''Find all file paths that appear after an "ASSIGN" key in the
+        deck. The files are sorted into input and output (=result) files by
+        applying regex_result_files.
+        The results are stored in the lists assigned_files and result_files.
+
+        Args:
+            None
+
+        Returns:
+            None
+        '''
+        self.assigned_files = []
+        self.result_files = []
         self.assigned_files = re.findall(r'ASSIGN \"(.*)\"', self.dck_text)
         for file in self.assigned_files.copy():
             if re.search(self.regex_result_files, file):
@@ -296,12 +414,11 @@ class DCK(object):
                             'This may cause issues. Is this regular expression'
                             ' correct? "'+self.regex_result_files+'"')
 
-    def get_errors(self):
-        return
-
 
 class DCK_processor(object):
     '''Deck processor class.
+    Create ``dck`` objects from regular TRNSYS input (deck) files and
+    manipulate them.
     '''
     def __init__(self, root_folder=r'C:\Trnsys17\Work\batch',
                  regex_result_files=regex_result_files_def):
@@ -878,7 +995,7 @@ def run_OptionParser(TRNExe, dck_proc):
                       dck_file_list,
                       update_dest=args.copy_files)
 
-        if args.copy_files:  # Copy all required files to --root_folder
+        if args.copy_files:  # Copy all required files to --sim_folder
             dck_proc.copy_assigned_files(dck_list)
 
     return dck_list  # Return a list of dck objects
