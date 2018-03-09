@@ -123,6 +123,12 @@ regex_result_files_def = r'Result|\.sum|\.pr.'
 
 class TRNExe(object):
     '''The TRNExe class.
+    The most prominent function a user will need is ``run_TRNSYS_dck_list()``,
+    in order to perform the actual TRNSYS simulations with a list of ``dck``
+    objects. All other functions are only used internally by that function.
+
+    The behaviour of the TRNExe object (run in parallel, run hidden, number
+    of CPU cores used) is controlled by the options given at initialization.
     '''
 
     def __init__(self,
@@ -138,7 +144,13 @@ class TRNExe(object):
         necessarily make total simulation time faster.
 
         Args:
-            n_cores (int, optional): Number of CPU cores to use
+            path_TRNExe (str): Path to the actual TRNSYS executable
+
+            mode_trnsys_hidden (bool): Run simulations completely hidden?
+
+            mode_exec_parallel (bool): Run simulations in parallel?
+
+            n_cores (int, optional): Number of CPU cores to use in parallel
 
         Returns:
             None
@@ -418,7 +430,34 @@ class DCK(object):
 class DCK_processor(object):
     '''Deck processor class.
     Create ``dck`` objects from regular TRNSYS input (deck) files and
-    manipulate them.
+    manipulate them. An example workflow could be:
+        * For parameter variations:
+
+            * ``read_parametric_table()``
+            * ``get_parametric_dck_list()``
+        * or for a simple list of deck files with manual replacements:
+
+            * ``create_dcks_from_file_list()``
+            * ``add_replacements_value_of_key()``
+        * ``rewrite_dcks()``
+        * ``copy_assigned_files()``
+
+    Then ``run_TRNSYS_dck_list()`` of a ``TRNExe`` object can be used to
+    simulate a ``dck_list``.
+
+    Additionally, post-processing functions are available which can be
+    used e.g. in the following order:
+
+        * ``report_errors()``
+        * ``results_collect()``
+        * ``results_create_index()``
+        * ``results_slice_time()``
+        * ``results_resample()``
+
+    This allows to collect the simulation results and store them as DataFrames,
+    create a proper Pandas multiindex from the results of parametric runs,
+    slice to select specific time intervals and / or resample the data to
+    new frequencies, e.g. from hours to months.
     '''
     def __init__(self, root_folder=r'C:\Trnsys17\Work\batch',
                  regex_result_files=regex_result_files_def):
@@ -426,15 +465,17 @@ class DCK_processor(object):
         self.regex_result_files = regex_result_files
 
     def auto_parametric_table(self, parametric_table, dck_file_list):
-        # A parametric table was given. Therefore we do the standard procedure
-        # of creating a deck list from the parameters. We add those lists for
-        # all given files
+        '''
+        A parametric table was given. Therefore we do the standard procedure
+        of creating a deck list from the parameters. We add those lists for
+        all given files
+        '''
         dck_list = []
         for dck_file in dck_file_list:
-            dck_list += dck_proc.get_parametric_dck_list(parametric_table,
-                                                         dck_file)
-        dck_proc.rewrite_dcks(dck_list)
-        dck_proc.copy_assigned_files(dck_list)
+            dck_list += self.get_parametric_dck_list(parametric_table,
+                                                     dck_file)
+        self.rewrite_dcks(dck_list)
+        self.copy_assigned_files(dck_list)
         return dck_list
 
     def read_parametric_table(self, param_table_file):
@@ -455,11 +496,11 @@ class DCK_processor(object):
         hash = hashlib.sha1(string).hexdigest()
         return hash
 
-    def read_filetypes(self, filepath, **args):
+    def read_filetypes(self, filepath, **kwargs):
         '''Read any file type with stored data and return the Pandas DataFrame.
         Wrapper around Pandas' read_excel() and read_csv().
 
-        Please note: With 'args', you can pass any (named) parameter down
+        Please note: With 'kwargs', you can pass any (named) parameter down
         to the Pandas functions. The TRNSYS printer adds some useless rows
         at the top and bottom of the file? No problem, just define 'skiprows'
         and 'skipfooter'. For all options, see:
@@ -468,23 +509,24 @@ class DCK_processor(object):
         filetype = os.path.splitext(os.path.basename(filepath))[1]
         if filetype in ['.xlsx', '.xls']:
             # Excel can be read automatically
-            df = pd.read_excel(filepath, **args)  # Pandas function
+            df = pd.read_excel(filepath, **kwargs)  # Pandas function
         elif filetype in ['.csv']:
             # Standard format: Here we guess everything. May or may not work
             df = pd.read_csv(filepath,
                              sep=None, engine='python',  # Guess separator
                              parse_dates=[0],  # Try to parse column 0 as date
                              infer_datetime_format=True,
-                             **args)
+                             **kwargs)
         elif filetype in ['.out']:
             # Standard format for TRNSYS: Separator is whitespace
             df = pd.read_csv(filepath,
                              delim_whitespace=True,
-                             **args)
+                             encoding='WINDOWS-1252',  # TRNSYS encoding
+                             **kwargs)
         elif filetype in ['.dat', '.txt']:
             logging.warning('Unsupported file extension: ' + filetype +
                             '. Trying to read it like a csv file.')
-            df = pd.read_csv(filepath, **args)
+            df = pd.read_csv(filepath, **kwargs)
         else:
             raise NotImplementedError('Unsupported file extension: "' +
                                       filetype + '" in file ' + filepath)
@@ -662,11 +704,21 @@ class DCK_processor(object):
         return
 
     def report_errors(self, dck_list):
+        '''Print all the errors stored in the ``dck`` objects of the given
+        dck_list.
+
+        Args:
+            dck_list (list): List of ``dck`` objects
+
+        Returns:
+            None
+        '''
         for dck in dck_list:
             if dck.success is False:
                 print('Errors in ' + dck.file_path_dest)
                 for i, error_msg in enumerate(dck.error_msg_list):
                     print('  '+str(i)+': '+error_msg)
+                print('')  # Finish with an empty line
         return
 
     def results_collect(self, dck_list, read_file_function, create_index=True):
