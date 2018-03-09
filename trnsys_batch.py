@@ -21,11 +21,9 @@ for your specific situation.
 '''
 
 import logging
-import os
 import trnpy
 import multiprocessing
 import pandas as pd
-from bokeh.command.bootstrap import main
 
 '''This allows to import a module from any location'''
 #sys.path.append(os.path.abspath('somewhere'))
@@ -33,7 +31,7 @@ from bokeh.command.bootstrap import main
 
 
 def trnsys_batch_example_01(dck_file):
-    '''The first example for batch execution of TRNSYS with the trnsyspy module
+    '''The first example for batch execution of TRNSYS with the TRNpy module.
     We have an Excel file with combinations of parameter values and want one
     TRNSYS simulation for each row in the table.
     '''
@@ -88,7 +86,7 @@ def trnsys_batch_example_01(dck_file):
                                            skipfooter=2,
                                            engine='python')
         elif 'Speicher.out' in result_file_path:
-            raise ValueError("Skip Speicher.out")
+            raise ValueError("Skip Speicher.out (not needed)")
         else:  # All other files can be read automatically
             return dck_proc.read_filetypes(result_file_path)
 
@@ -97,44 +95,40 @@ def trnsys_batch_example_01(dck_file):
     result_data = dck_proc.results_collect(dck_list, read_file_function)
 
     # Put the time and parameter columns into the index of the DataFrame.
+#    data_start_date = '2003-01-01'
+    data_start_date = '2005-01-01'
     result_data = dck_proc.results_create_index(result_data,
                                                 dck_list[0].replace_dict,
-                                                '2003-01-01')
+                                                data_start_date)
 
     # Now we have got all the results in memory. We can call them by their file
     # paths (as assigned in TRNSYS).
-#    df_hourly = result_data[r'Result\temperaturen_1.out']
-#    print(df_hourly)
+    df_hour = result_data[r'Result\temperaturen_1.out']
+#    print(df_hour)
 
-    # Slicing the index to receive only the last year (since we simulated
-    # three identical years in succession).
-#    df_hourly = df_hourly.loc[(slice(None), slice(None),
-#                               slice(None),
-#                               slice('2005-01-01', '2006-01-01')), :]
-#    print(df_hourly)
+    # Slicing the index for a new time interval
+#    df_hour = dck_proc.results_slice_time(df_hour, '2005-01-01', '2006-01-01')
+    df_hour = dck_proc.results_slice_time(df_hour, '2006-01-01', '2008-01-01')
+#    print(df_hour)
 
     # Now depending on our needs, we can also group the data by week or year
-#    df_daily = dck_proc.results_resample(df_hourly, freq='D')
-#    df_weekly = dck_proc.results_resample(df_hourly, freq='W')
-#    print(df_weekly)
-#    df_monthly = dck_proc.results_resample(df_hourly, freq='M')
-#    print(df_monthly)
-#    df_year = dck_proc.results_resample(df_hourly, freq='Y')
-#    print(df_year)
+#    freq = 'D'
+#    freq = 'W'
+    freq = 'M'
+#    freq = 'Y'
+    df_resample = dck_proc.results_resample(df_hour, freq=freq,
+                                            regex_mean=r'T_|M_|WP_COP')
+    print(df_resample)
 
     df_energy_1 = result_data[r'Result\simsum_energie_1.out']
     df_energy_2 = result_data[r'Result\simsum_energie_2.out']
     df_energy = pd.concat([df_energy_1, df_energy_2], axis=1)
     df_energy.drop(columns=['Month', 'hash', 'hash.1'], inplace=True)
-    print(df_energy)
+#    print(df_energy)
 
     # With the manipulation completed, we have the option to view the result:
-#    open_in_dataexplorer(dck_proc, df_daily)
-#    open_in_dataexplorer(dck_proc, df_hourly)
-#    open_in_dataexplorer(dck_proc, df_weekly)
-#    open_in_dataexplorer(dck_proc, df_monthly)
-#    open_in_dataexplorer(dck_proc, df_year)
-    open_in_dataexplorer(dck_proc, df_energy)
+    dck_proc.DataExplorer_open(df_resample)
+#    dck_proc.DataExplorer_open(df_energy)
 
 
 def trnsys_batch_example_02(dck_file_list):
@@ -185,34 +179,6 @@ def trnsys_batch_example_02(dck_file_list):
     dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
 
 
-def open_in_dataexplorer(dck_proc, DatEx_df):
-    # Put '!' in front of index column names, to mark them as classifications
-    DatEx_df = dck_proc.mark_index_for_DataExplorer(DatEx_df)
-
-    # Prepare settings:
-    bokeh_app = r'C:\Users\nettelstroth\Documents\07 Python\dataexplorer'
-    DatEx_data_name = 'TRNSYS Results'
-    DatEx_file_path = os.path.join(bokeh_app, 'upload',
-                                   DatEx_data_name + '.xlsx')
-#                                   'TRNSYS_results.csv')
-    logging.info('Saving file for DataExplorer... ')
-    logging.info(DatEx_file_path)
-    # Save this as a file that DataExplorer will load again
-    print(DatEx_df.head())
-    DatEx_df.to_excel(DatEx_file_path, merge_cells=False)
-#    DatEx_df.to_csv(DatEx_file_path, sep=';', index=True)
-
-    logging.info('Starting DataExplorer...')
-    # Call Bokeh app:
-    main(["bokeh", "serve", bokeh_app,
-#          "--show",
-          "--port", "80",
-          "--log-level", "warning",
-          "--args",
-          "--name", DatEx_data_name,
-          "--file", DatEx_file_path])
-
-
 if __name__ == "__main__":
     '''Main function
     This function is executed when the script is started directly with
@@ -229,30 +195,30 @@ if __name__ == "__main__":
 #    logging.basicConfig(format='%(asctime)-15s %(message)s', level='ERROR')
 
     dck_file_list = [
-#        r'Steinfurt_180105\Steinfurt_180105.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test1.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test2.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test3.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test4.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test5.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test6.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test7.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test8.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test9.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test10.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test11.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test12.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test13.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test14.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test15.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test16.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test17.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test18.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test19.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171204.dck',
-#        r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171201.dck',
-#        r'C:\Trnsys17\Work\futureSuN\HK\Hannover_Koll_Multi_170222.dck',
+        #    r'Steinfurt_180105\Steinfurt_180105.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test1.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test2.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test3.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test4.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test5.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test6.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test7.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test8.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test9.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test10.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test11.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test12.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test13.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test14.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test15.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test16.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test17.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test18.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_180105_test19.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171204.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\SB\Steinfurt_171201.dck',
+        #    r'C:\Trnsys17\Work\futureSuN\HK\Hannover_Koll_Multi_170222.dck',
         r'C:\Trnsys17\Work\futureSuN\HK\Hannover_Koll_Multi_180220.dck',
         ]
 

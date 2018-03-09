@@ -116,6 +116,7 @@ import pandas as pd
 import psutil
 import hashlib
 from tkinter import Tk, filedialog
+from bokeh.command.bootstrap import main
 
 # Default values that are used by multiple classes:
 regex_result_files_def = r'Result|\.sum|\.pr.'
@@ -836,7 +837,7 @@ class DCK_processor(object):
             # Create a list and use that as the new index columns
             idx_cols = list(replace_dict.keys()) + [t_col]
             df.set_index(keys=idx_cols, inplace=True)
-            df = df.sort_index()
+            df.sort_index(inplace=True)
 
         return result_data
 
@@ -938,8 +939,44 @@ class DCK_processor(object):
                 idx_cols_rename.append('!'+name)
             else:
                 idx_cols_rename.append(name)
+        if len(idx_cols_rename) == 1:
+            idx_cols_rename = idx_cols_rename[0]
         df.index = df.index.rename(idx_cols_rename)
         return df
+
+    def DataExplorer_open(self, DatEx_df, data_name='TRNSYS Results', port=80,
+                          bokeh_app=r'C:\Users\nettelstroth\Documents' +
+                                    r'\07 Python\dataexplorer',
+                          show=False):
+        '''Open the given DataFrame in the DataExplorer application. TRNpy and
+        DataExplorer are a great combination, because the values of parametric
+        runs can be viewed and filtered as classes in the DataExplorer.
+        '''
+        # Mark index column names as classifications
+        DatEx_df = self.DataExplorer_mark_index(DatEx_df)
+
+        # Prepare settings:
+        data_file = os.path.join(bokeh_app, 'upload', data_name + '.xlsx')
+        logging.info('Saving file for DataExplorer... ')
+        logging.info(data_file)
+        print(DatEx_df.head())
+
+        # Save this as a file that DataExplorer will load again
+        DatEx_df.to_excel(data_file, merge_cells=False)
+
+        logging.info('Starting DataExplorer...')
+        try:
+            call_list = ["bokeh", "serve", bokeh_app, "--port", str(port)]
+            if show:
+                call_list.append("--show")
+            call_list += ["--args",
+                          "--name", data_name,
+                          "--file", data_file]
+            # Call Bokeh app:
+            main(call_list)
+        except SystemExit:
+            # Would produce ugly print (when port is already in use)
+            pass
 
 
 def file_dialog_dck(initialdir=os.getcwd()):
