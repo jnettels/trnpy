@@ -840,16 +840,95 @@ class DCK_processor(object):
 
         return result_data
 
-    def results_resample(self, df, freq):
+    def results_slice_time(self, df, start, end):
+        '''Slice the time index from ``"start"`` to ``"end"``, while keeping
+        the other index columns intact. Expects the time column to be at last
+        position in the multi-index.
+
+        Args:
+            df (DataFrame): Pandas DataFrame to slice
+
+            start (str): Start date/time for slicing interval
+
+            end (str): End date/time for slicing interval
+
+        Returns:
+            df_new (DataFrame): Sliced DataFrame
+        '''
+        n_index_cols = len(df.index.names)  # Number of index columns
+        if n_index_cols == 1:
+            df_new = df.loc[start:end]  # Slice regular index
+        else:
+            slice_list = [slice(None)]*(n_index_cols-1) + [slice(start, end)]
+            slices = tuple(slice_list)  # Convert list to tuple
+            df_new = df.loc[slices, :]  # Slice multiindex
+        return df_new
+
+    def results_resample(self, df, freq, regex_sum=r'Q_|E_',
+                         regex_mean=r'T_|M_', **kwargs):
         '''Resample a multi-indexed DataFrame to a new frequency.
         Expects the time column to be at last position in the multi-index.
-        '''
-        level_values = df.index.get_level_values
-        levels = range(len(df.index.names))[:-1]  # All columns except time
-        return (df.groupby([level_values(i) for i in levels]
-                           + [pd.Grouper(freq=freq, level=-1)]).sum())
+        Columns not matched by the regular expressions will be dropped with
+        an info message.
 
-    def mark_index_for_DataExplorer(self, df):
+        Args:
+            df (DataFrame): Pandas DataFrame to resample
+
+            freq (str): Pandas frequency, e.g. ``"D"``, ``"W"``, ``"M"``
+            or ``"Y"``. For a full list, see the Pandas documentation at
+            http://pandas.pydata.org/pandas-docs/stable/timeseries.html#offset-aliases
+
+            regex_sum (str): Regular expression that matches all names of
+            columns that should be summed up (e.g. energy values)
+
+            regex_mean (str): Regular expression that matches all names of
+            columns that should use the mean (e.g. temperatures)
+
+        kwargs:
+            Additional keyword arguments, can be used to pass ``"closed"``
+            and/or ``"label"`` (each with the values ``"left"`` or ``"right"``)
+            to the ``"resample()"`` function
+
+        Returns:
+            df_new (DataFrame): Resampled DataFrame
+        '''
+        # Apply the regular expressions to get two lists of columns
+        cols_sum = []
+        cols_mean = []
+        cols_found = []
+        for column in df.columns:
+            if re.search(regex_sum, column):
+                cols_sum.append(column)
+                cols_found.append(column)
+            elif re.search(regex_mean, column):
+                cols_mean.append(column)
+                cols_found.append(column)
+            else:
+                logging.info('Column "'+column+'" did not match the regular '
+                             'expressions and will not be resampled')
+
+        if len(df.index.names) == 1:
+            # If there is only the time column in the index, the resampling
+            # is straight forward
+            sum_df = df[cols_sum].resample(freq, **kwargs).sum()
+            mean_df = df[cols_mean].resample(freq, **kwargs).mean()
+
+        else:
+            # Perform the resampling while preserving the multiindex,
+            # achieved with the groupby function
+            level_values = df.index.get_level_values
+            levels = range(len(df.index.names))[:-1]  # All columns except time
+
+            sum_df = (df[cols_sum].groupby([level_values(i) for i in levels]
+                      + [pd.Grouper(freq=freq, **kwargs, level=-1)]).sum())
+            mean_df = (df[cols_mean].groupby([level_values(i) for i in levels]
+                       + [pd.Grouper(freq=freq, **kwargs, level=-1)]).mean())
+        # Recombine the two DataFrames into one
+        df_new = pd.concat([sum_df, mean_df], axis=1)
+        df_new = df_new[cols_found]  # Sort columns in their original order
+        return df_new
+
+    def DataExplorer_mark_index(self, df):
         '''Put '!' in front of index column names, to mark them as
         classifications. Is not applied to time columns.
         '''
