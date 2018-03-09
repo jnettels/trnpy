@@ -41,7 +41,7 @@ def trnsys_batch_example_01(dck_file):
 
     # Load a parametric table located in the current directory
     param_table_file = r'Parametrics.xlsx'
-    param_table = dck_proc.read_parametric_table(param_table_file)
+    param_table = dck_proc.parametric_table_read(param_table_file)
 
     # Modify the table on demand (select only certain rows)
 #    param_table = param_table.loc[0:1]

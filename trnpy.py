@@ -441,7 +441,7 @@ class DCK_processor(object):
     manipulate them. An example workflow could be:
         * For parameter variations:
 
-            * ``read_parametric_table()``
+            * ``parametric_table_read()``
             * ``get_parametric_dck_list()``
         * or for a simple list of deck files with manual replacements:
 
@@ -472,7 +472,7 @@ class DCK_processor(object):
         self.root_folder = root_folder
         self.regex_result_files = regex_result_files
 
-    def auto_parametric_table(self, parametric_table, dck_file_list):
+    def parametric_table_auto(self, parametric_table, dck_file_list):
         '''
         A parametric table was given. Therefore we do the standard procedure
         of creating a deck list from the parameters. We add those lists for
@@ -486,7 +486,7 @@ class DCK_processor(object):
         self.copy_assigned_files(dck_list)
         return dck_list
 
-    def read_parametric_table(self, param_table_file):
+    def parametric_table_read(self, param_table_file):
         parametric_table = self.read_filetypes(param_table_file)
 #        print(param_df.)
 #        combis = itertools.combinations(self.vals_active, r=2)
@@ -545,7 +545,7 @@ class DCK_processor(object):
         if isinstance(parametric_table, str):
             # Default is to hand over a parametric_table DataFrame. For
             # convenience, a file path is accepted and read into a DataFrame
-            parametric_table = self.read_parametric_table(parametric_table)
+            parametric_table = self.parametric_table_read(parametric_table)
 
         # Start building the list of deck objects
         dck_list = []
@@ -1159,7 +1159,7 @@ def run_OptionParser(TRNExe, dck_proc):
             parametric_table = file_dialog_parametrics()
         if parametric_table is not None:
             # A parametric table was given. Automate the default procedure
-            dck_list = dck_proc.auto_parametric_table(parametric_table,
+            dck_list = dck_proc.parametric_table_auto(parametric_table,
                                                       dck_file_list)
         else:
             parametric_table = 'disabled'
