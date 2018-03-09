@@ -188,20 +188,27 @@ class TRNExe(object):
                 proc.terminate()
                 dck.error_msg_list.append('Low CPU load - timeout')
                 dck.success = False
-                return dck
-
-        logging.debug('Finished PID ' + str(proc.pid))
 
         # Check for error messages in the log and store them in the deck object
-        if self.check_log_for_errors(dck) is False:
+        if self.check_log_for_errors(dck) is False or dck.success is False:
             dck.success = False
+            logging.debug('Finished PID ' + str(proc.pid) + ' with errors')
         else:
+            logging.debug('Finished PID ' + str(proc.pid))
             dck.success = True
         # Return the deck object
         return dck
 
     def check_log_for_errors(self, dck):
         '''Stores errors in error_msg_list. Returns False if errors are found.
+        Function tries to open the log file of the given simulation and
+        searches for error messages with a regular expression.
+
+        Args:
+            dck (dck object): Simulation to check for errors
+
+        Returns:
+            True/False (bool): Did simulation finish successfully?
         '''
         logfile_path = os.path.splitext(dck.file_path_dest)[0] + '.log'
         try:
@@ -213,11 +220,11 @@ class TRNExe(object):
 
         re_msg = r'Fatal Error.*\n.*\n.*\n.*Message.*\:\ (?P<msg>.*\n.*)'
         match_list = re.findall(re_msg, logfile)
-        if match_list:
+        if match_list:  # Matches of the regular expression were found
             for msg in match_list:
-                dck.error_msg_list.append(msg)
+                dck.error_msg_list.append(msg)  # Store error messages
             return False
-        else:
+        else:  # No error messages found
             return True
 
     def TRNExe_is_alive(self, pid, interval_1=0.3, interval_2=9.7):
