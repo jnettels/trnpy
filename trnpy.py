@@ -115,6 +115,7 @@ import time
 import pandas as pd
 import psutil
 import hashlib
+import itertools
 from tkinter import Tk, filedialog
 from bokeh.command.bootstrap import main
 
@@ -473,10 +474,18 @@ class DCK_processor(object):
         self.regex_result_files = regex_result_files
 
     def parametric_table_auto(self, parametric_table, dck_file_list):
-        '''
+        '''Convenient automated parametric table function.
         A parametric table was given. Therefore we do the standard procedure
-        of creating a deck list from the parameters. We add those lists for
-        all given files
+        of creating a ``dck`` object list from the parameters. We add those
+        lists for all given files.
+
+        Args:
+            parametric_table (DataFrame): Pandas DataFrame
+
+            dck_file_list (list): List of file paths
+
+        Returns:
+            dck_list (list): List of dck objects
         '''
         dck_list = []
         for dck_file in dck_file_list:
@@ -487,12 +496,38 @@ class DCK_processor(object):
         return dck_list
 
     def parametric_table_read(self, param_table_file):
+        '''Reads a parametric table from a given file and return it as a
+        DataFrame. Uses ``read_filetypes()`` to read the file.
+
+        Args:
+            param_table_file (str): Path to a file
+
+        Returns:
+            parametric_table (DataFrame): Pandas DataFrame
+        '''
         parametric_table = self.read_filetypes(param_table_file)
-#        print(param_df.)
-#        combis = itertools.combinations(self.vals_active, r=2)
-#        parametric_table.set_index('hash', inplace=True)
 
         logging.info(param_table_file+':')
+        if logging.getLogger().isEnabledFor(logging.INFO):
+            print(parametric_table)
+
+        return parametric_table
+
+    def parametric_table_combine(self, parameters):
+        '''Produces a parametric table from all combinations of individual
+        values of the given parameters.
+
+        Args:
+            parameters (dict): Dictionary with parameters and their values
+
+        Returns:
+            parametric_table (DataFrame): Pandas DataFrame
+        '''
+        flat = [[(k, v) for v in vs] for k, vs in parameters.items()]
+        combis = [dict(items) for items in itertools.product(*flat)]
+        parametric_table = pd.DataFrame.from_dict(combis)
+
+        logging.info('Parametric table from combinations:')
         if logging.getLogger().isEnabledFor(logging.INFO):
             print(parametric_table)
 
