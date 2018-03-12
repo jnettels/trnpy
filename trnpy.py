@@ -879,7 +879,8 @@ class DCK_processor(object):
     def results_slice_time(self, df, start, end):
         '''Slice the time index from ``"start"`` to ``"end"``, while keeping
         the other index columns intact. Expects the time column to be at last
-        position in the multi-index.
+        position in the multi-index. Date/time strings can be formatted e.g.
+        ``"2018-01-01"`` or ``"2018-01-15 08:00"``
 
         Args:
             df (DataFrame): Pandas DataFrame to slice
@@ -891,6 +892,8 @@ class DCK_processor(object):
         Returns:
             df_new (DataFrame): Sliced DataFrame
         '''
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
         n_index_cols = len(df.index.names)  # Number of index columns
         if n_index_cols == 1:
             df_new = df.loc[start:end]  # Slice regular index
