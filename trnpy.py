@@ -952,13 +952,20 @@ class DCK_processor(object):
         else:
             # Perform the resampling while preserving the multiindex,
             # achieved with the groupby function
-            level_values = df.index.get_level_values
+            level_vls = df.index.get_level_values
             levels = range(len(df.index.names))[:-1]  # All columns except time
 
-            sum_df = (df[cols_sum].groupby([level_values(i) for i in levels]
-                      + [pd.Grouper(freq=freq, **kwargs, level=-1)]).sum())
-            mean_df = (df[cols_mean].groupby([level_values(i) for i in levels]
-                       + [pd.Grouper(freq=freq, **kwargs, level=-1)]).mean())
+            if len(cols_sum) > 0:
+                sum_df = (df[cols_sum].groupby([level_vls(i) for i in levels]
+                          + [pd.Grouper(freq=freq, **kwargs, level=-1)]).sum())
+            else:
+                sum_df = pd.DataFrame()  # No sum() required, use empty df
+            if len(cols_mean) > 0:
+                mean_df = (df[cols_mean].groupby([level_vls(i) for i in levels]
+                           + [pd.Grouper(freq=freq, **kwargs, level=-1)]
+                           ).mean())
+            else:
+                mean_df = pd.DataFrame()  # No mean() required, use empty df
         # Recombine the two DataFrames into one
         df_new = pd.concat([sum_df, mean_df], axis=1)
         df_new = df_new[cols_found]  # Sort columns in their original order
