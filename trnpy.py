@@ -880,7 +880,7 @@ class DCK_processor(object):
         '''Slice the time index from ``"start"`` to ``"end"``, while keeping
         the other index columns intact. Expects the time column to be at last
         position in the multi-index. Date/time strings can be formatted e.g.
-        ``"2018-01-01"`` or ``"2018-01-15 08:00"``
+        ``"2018-01-01"`` or ``"2018-01-15 08:00"``.
 
         Args:
             df (DataFrame): Pandas DataFrame to slice
@@ -992,7 +992,7 @@ class DCK_processor(object):
     def DataExplorer_open(self, DatEx_df, data_name='TRNSYS Results', port=80,
                           bokeh_app=r'C:\Users\nettelstroth\Documents' +
                                     r'\07 Python\dataexplorer',
-                          show=False):
+                          show=False, output_backend='canvas'):
         '''Open the given DataFrame in the DataExplorer application. TRNpy and
         DataExplorer are a great combination, because the values of parametric
         runs can be viewed and filtered as classes in the DataExplorer.
@@ -1016,7 +1016,8 @@ class DCK_processor(object):
                 call_list.append("--show")
             call_list += ["--args",
                           "--name", data_name,
-                          "--file", data_file]
+                          "--file", data_file,
+                          "--bokeh_output_backend", output_backend]
             # Call Bokeh app:
             main(call_list)
         except SystemExit:
