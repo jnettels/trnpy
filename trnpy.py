@@ -992,13 +992,14 @@ class DCK_processor(object):
     def DataExplorer_open(self, DatEx_df, data_name='TRNSYS Results', port=80,
                           bokeh_app=r'C:\Users\nettelstroth\Documents' +
                                     r'\07 Python\dataexplorer',
-                          show=False, output_backend='canvas'):
+                          show=True, output_backend='webgl', mark_index=True):
         '''Open the given DataFrame in the DataExplorer application. TRNpy and
         DataExplorer are a great combination, because the values of parametric
         runs can be viewed and filtered as classes in the DataExplorer.
         '''
         # Mark index column names as classifications
-        DatEx_df = self.DataExplorer_mark_index(DatEx_df)
+        if mark_index:
+            DatEx_df = self.DataExplorer_mark_index(DatEx_df)
 
         # Prepare settings:
         data_file = os.path.join(bokeh_app, 'upload', data_name + '.xlsx')
