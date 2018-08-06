@@ -1035,7 +1035,7 @@ def file_dialog_dck(initialdir=os.getcwd()):
     Return:
         paths (List): List of file paths
     '''
-    title = 'Please choose a TRNSYS Input File'
+    title = 'Please choose a TRNSYS Input File (*.dck)'
     logging.info(title)
     root = Tk()
     root.withdraw()
@@ -1052,7 +1052,7 @@ def file_dialog_dck(initialdir=os.getcwd()):
 
 
 def file_dialog_parametrics(initialdir=os.getcwd()):
-    '''This function presents a file dialog fora parametric table file.
+    '''This function presents a file dialog for a parametric table file.
 
     Args:
         None
@@ -1101,13 +1101,13 @@ def run_OptionParser(TRNExe, dck_proc):
 
 #    parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
-    group1 = parser.add_argument_group('Important options', 'Use the ' +
+    group1 = parser.add_argument_group('Basic options', 'Use the ' +
                                        'following options to define how to ' +
                                        'run this program.')
 
-    group1.add_argument('-d', '--deck', dest='dck', help='One or multiple ' +
-                        'paths to TRNSYS input files. If not specified, a ' +
-                        'file dialog opens instead', type=str, nargs='+')
+    group1.add_argument('-d', '--deck', dest='dck', help='One or more paths ' +
+                        'to TRNSYS input files (*.dck). If not specified, ' +
+                        'a file dialog opens instead', type=str, nargs='+')
 
     group1.add_argument('--hidden', action='store_true',
                         dest='mode_trnsys_hidden',
@@ -1122,7 +1122,7 @@ def run_OptionParser(TRNExe, dck_proc):
     group1.add_argument('-c', '--copy_files', action='store_true',
                         dest='copy_files',
                         help='Copy simulation files to a new folder within ' +
-                        'ROOT_FOLDER. This helps to prevent conflicts ' +
+                        'SIM_FOLDER. This helps to prevent conflicts ' +
                         'between different simulations.',
                         default=False)
 
@@ -1187,7 +1187,9 @@ def run_OptionParser(TRNExe, dck_proc):
     if args.dck is None:
         dck_file_list = file_dialog_dck()
         if dck_file_list is None:
-            logging.debug('Empty selection, exit program.')
+            logging.info('Empty selection. Show help and exit program...')
+            parser.print_help()
+            input('\nPress the enter key to exit.')
             raise SystemExit
     else:
         # Get list of deck files (and convert relative into absolute paths)
