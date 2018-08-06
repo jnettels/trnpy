@@ -359,7 +359,7 @@ class TRNExe(object):
             # Do the print
             print(text, end='\r')
             time.sleep(1.0)  # Sleep a certain number of seconds
-        print('\x1b[2K', end='\r')  # Clear last output line
+        print('100.0% done.', end='\r')  # Finish the last output with 100%
         return
 
 
@@ -577,6 +577,26 @@ class DCK_processor(object):
         return df
 
     def get_parametric_dck_list(self, parametric_table, dck_file):
+        '''Create a list of deck objects from  a ``parametric_table`` and
+        one path to a deck file. For each row in the table, one deck object
+        is created and parameters and their values in that row are prepared
+        for replacement.
+
+        After this function call, you will most likely also have to call:
+
+        * ``dck_proc.rewrite_dcks(dck_list)``
+        * ``dck_proc.copy_assigned_files(dck_list)``
+
+        But you can manualy add other replacements before that, if required.
+
+        Args:
+            parametric_table (DataFrame): Pandas DataFrame with parameters
+
+            dck_file (str): Path to a TRNSYS deck file
+
+        Returns:
+            dck_list (list): List of ``dck`` objects
+        '''
         if isinstance(parametric_table, str):
             # Default is to hand over a parametric_table DataFrame. For
             # convenience, a file path is accepted and read into a DataFrame
@@ -653,15 +673,39 @@ class DCK_processor(object):
         '''
         dck.replace_dict = dict()
 
-    def create_dcks_from_file_list(self, dck_file_list, update_dest=False):
+    def create_dcks_from_file_list(self, dck_file_list, update_dest=False,
+                                   copy_files=False):
         '''Takes a list of file paths and creates deck objects for each one.
-        If the optional argument 'update_dest' is True, the destination path
-        is updated and based on the 'root_folder'.
+        If the optional argument ``update_dest`` is True, the destination path
+        becomes a folder with the name of the file, inside the ``root_folder``
+        (which is a property of the ``dck_processor`` object).
         The default False means simulating the deck in the original folder.
 
-        Please make sure that the dck_file_list contains actual paths.
-        If the deck file is in the same folder as the script, the path has
-        to be "./TRNSYS_input_file.dck".
+        .. note::
+            Please make sure that the ``dck_file_list`` contains actual paths,
+            not only file names.
+            If the deck file is located in the same folder as the script,
+            the path has to be ``"./TRNSYS_input_file.dck"``.
+
+        .. note::
+            With ``update_dest=True`` you will need to set ``copy_files=True``
+            or call ``dck_proc.copy_assigned_files(dck_list)`` afterwards.
+
+        Args:
+            dck_list (list): List of paths to deck files to work on
+
+            update_dest (bool, optional):
+
+                * True: Simulate within ``root_folder``
+                * False: Simulate in the original folder (default)
+
+            copy_files (bool, optional): If ``update_dest`` is True,
+            this calls ``dck_proc.copy_assigned_files(dck_list)`` (which
+            you would have to do manually otherwise!)
+
+        Returns:
+            dck_list (list): List of ``dck`` objects
+
         '''
         dck_list = [DCK(dck_file, regex_result_files=self.regex_result_files)
                     for dck_file in dck_file_list]
@@ -670,18 +714,24 @@ class DCK_processor(object):
                 dck.file_path_dest = os.path.join(self.root_folder,
                                                   dck.file_name,
                                                   dck.file_name+'.dck')
+            if copy_files:
+                self.copy_assigned_files(dck_list)
+
         return dck_list
 
-    def rewrite_dcks(self, dck_list):
-        '''Perform the replacements in self.replace_dict in the deck files.
+    def rewrite_dcks(self, dck_list, print_warnings=True):
+        '''Perform the replacements in ``self.replace_dict`` in the deck files.
         You have to use add_replacements(), add_replacements_value_of_key()
         or disable_plotters() before, to fill the replace_dict.
 
         Args:
-            dck_list (list): List of paths to deck files to work on
+            dck_list (list): List of ``dck`` objects to work on
+
+            print_warnings (bool, optional): Print warning for unsuccessful
+            replacements. Default is True.
 
         Returns:
-            dck_list (list): List of paths
+            dck_list (list): List of ``dck`` objects, now manipulated
         '''
         # Process the deck file(s)
         for dck in dck_list:
@@ -690,7 +740,7 @@ class DCK_processor(object):
                 dck.dck_text, number_of_subs_made = re.subn(re_find,
                                                             re_replace,
                                                             dck.dck_text)
-                if number_of_subs_made == 0:
+                if number_of_subs_made == 0 and print_warnings:
                     logging.warning('Warning: Replacement not successful, ' +
                                     'because regex was not found: '+re_find)
 
@@ -910,6 +960,10 @@ class DCK_processor(object):
         Columns not matched by the regular expressions will be dropped with
         an info message.
 
+        .. note::
+            Resampling for weeks with 'W' and months with 'M' will use actual
+            calendar data (weeks do not necessarily begin on January 1.).
+
         Args:
             df (DataFrame): Pandas DataFrame to resample
 
@@ -969,6 +1023,7 @@ class DCK_processor(object):
                            ).mean())
             else:
                 mean_df = pd.DataFrame()  # No mean() required, use empty df
+
         # Recombine the two DataFrames into one
         df_new = pd.concat([sum_df, mean_df], axis=1)
         df_new = df_new[cols_found]  # Sort columns in their original order
