@@ -584,19 +584,19 @@ class DCK_processor(object):
 
         # Start building the list of deck objects
         dck_list = []
-        for hash in parametric_table.index.values:
+        for hash_ in parametric_table.index.values:
             # For each row in the table, one deck object is created and
             # updated with the correct information.
             dck = DCK(dck_file, regex_result_files=self.regex_result_files)
-            dck.hash = str(hash)
+            dck.hash = hash_
             dck.file_path_dest = os.path.join(self.root_folder,
                                               dck.file_name,
-                                              dck.hash,
+                                              str(dck.hash),
                                               dck.file_name+'.dck')
 
             # Store the replacements found in the deck object
             for col in parametric_table.columns:
-                dck.replace_dict[col] = parametric_table.loc[hash][col]
+                dck.replace_dict[col] = parametric_table.loc[hash_][col]
             # Convert the replacements into regular expressions
             self.add_replacements_value_of_key(dck.replace_dict, dck)
             # Done. Add the deck to the list.
@@ -870,7 +870,7 @@ class DCK_processor(object):
                                        origin=pd.Timestamp(origin))
 
             # Create a list and use that as the new index columns
-            idx_cols = list(replace_dict.keys()) + [t_col]
+            idx_cols = ['hash'] + list(replace_dict.keys()) + [t_col]
             df.set_index(keys=idx_cols, inplace=True)
             df.sort_index(inplace=True)
 
