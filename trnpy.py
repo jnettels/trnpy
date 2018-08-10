@@ -1162,7 +1162,8 @@ def run_OptionParser(TRNExe, dck_proc):
 
     group1.add_argument('-d', '--deck', dest='dck', help='One or more paths ' +
                         'to TRNSYS input files (*.dck). If not specified, ' +
-                        'a file dialog opens instead', type=str, nargs='+')
+                        'a file dialog opens instead', type=str, nargs='+',
+                        default=[])
 
     group1.add_argument('--hidden', action='store_true',
                         dest='mode_trnsys_hidden',
@@ -1225,7 +1226,8 @@ def run_OptionParser(TRNExe, dck_proc):
                         default=TRNExe.n_cores)
 
     # Read the user input:
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    args.dck += unknown  # any "unknown" arguments are also treated as decks
 
     # Save user input by overwriting the default values:
     TRNExe.path_TRNExe = args.path_TRNExe
@@ -1239,7 +1241,7 @@ def run_OptionParser(TRNExe, dck_proc):
     FORMAT = '%(asctime)-15s %(message)s'
     logging.basicConfig(format=FORMAT, level=args.log_level.upper())
 
-    if args.dck is None:
+    if len(args.dck) == 0:
         dck_file_list = file_dialog_dck()
         if dck_file_list is None:
             logging.info('Empty selection. Show help and exit program...')
