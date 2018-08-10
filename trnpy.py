@@ -114,7 +114,6 @@ import subprocess
 import time
 import pandas as pd
 import psutil
-import hashlib
 import itertools
 from tkinter import Tk, filedialog
 from bokeh.command.bootstrap import main
@@ -532,12 +531,6 @@ class DCK_processor(object):
             print(parametric_table)
 
         return parametric_table
-
-    def gen_row_hash(self):
-        '''Unused'''
-        string = 'a'
-        hash = hashlib.sha1(string).hexdigest()
-        return hash
 
     def read_filetypes(self, filepath, **kwargs):
         '''Read any file type with stored data and return the Pandas DataFrame.
