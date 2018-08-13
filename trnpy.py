@@ -116,7 +116,6 @@ import pandas as pd
 import psutil
 import itertools
 from tkinter import Tk, filedialog
-from bokeh.command.bootstrap import main
 
 # Default values that are used by multiple classes:
 regex_result_files_def = r'Result|\.sum|\.pr.'
@@ -1021,57 +1020,6 @@ class DCK_processor(object):
         df_new = pd.concat([sum_df, mean_df], axis=1)
         df_new = df_new[cols_found]  # Sort columns in their original order
         return df_new
-
-    def DataExplorer_mark_index(self, df):
-        '''Put '!' in front of index column names, to mark them as
-        classifications. Is not applied to time columns.
-        '''
-        idx_cols_rename = []
-        for name in df.index.names:
-            if name not in ['TIME', 'Time', 'time']:
-                idx_cols_rename.append('!'+name)
-            else:
-                idx_cols_rename.append(name)
-        if len(idx_cols_rename) == 1:
-            idx_cols_rename = idx_cols_rename[0]
-        df.index = df.index.rename(idx_cols_rename)
-        return df
-
-    def DataExplorer_open(self, DatEx_df, data_name='TRNSYS Results', port=80,
-                          bokeh_app=r'C:\Users\nettelstroth\Documents' +
-                                    r'\07 Python\dataexplorer',
-                          show=True, output_backend='webgl', mark_index=True):
-        '''Open the given DataFrame in the DataExplorer application. TRNpy and
-        DataExplorer are a great combination, because the values of parametric
-        runs can be viewed and filtered as classes in the DataExplorer.
-        '''
-        # Mark index column names as classifications
-        if mark_index:
-            DatEx_df = self.DataExplorer_mark_index(DatEx_df)
-
-        # Prepare settings:
-        data_file = os.path.join(bokeh_app, 'upload', data_name + '.xlsx')
-        logging.info('Saving file for DataExplorer... ')
-        logging.info(data_file)
-        print(DatEx_df.head())
-
-        # Save this as a file that DataExplorer will load again
-        DatEx_df.to_excel(data_file, merge_cells=False)
-
-        logging.info('Starting DataExplorer...')
-        try:
-            call_list = ["bokeh", "serve", bokeh_app, "--port", str(port)]
-            if show:
-                call_list.append("--show")
-            call_list += ["--args",
-                          "--name", data_name,
-                          "--file", data_file,
-                          "--bokeh_output_backend", output_backend]
-            # Call Bokeh app:
-            main(call_list)
-        except SystemExit:
-            # Would produce ugly print (when port is already in use)
-            pass
 
 
 def file_dialog_dck(initialdir=os.getcwd()):
