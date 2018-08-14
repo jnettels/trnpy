@@ -58,7 +58,9 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
     DatEx_df.to_excel(data_file, merge_cells=False)
 
     logging.info('Starting DataExplorer...')
-    try:
+
+    port_blocked = True
+    while port_blocked:
         call_list = ["bokeh", "serve", bokeh_app, "--port", str(port)]
         if show:
             call_list.append("--show")
@@ -66,8 +68,10 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
                       "--name", data_name,
                       "--file", data_file,
                       "--bokeh_output_backend", output_backend]
-        # Call Bokeh app:
-        main(call_list)
-    except SystemExit:
-        # Would produce ugly print (when port is already in use)
-        pass
+        try:
+            main(call_list)  # Call Bokeh app
+        except SystemExit:
+            # Error would produce ugly print (when port is already in use)
+            port += 1  # Increment port number for the next try
+        else:  # try was successful, no SystemExit was raised
+            port_blocked = False
