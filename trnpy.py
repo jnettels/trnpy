@@ -1230,10 +1230,13 @@ if __name__ == "__main__":
     '''
     multiprocessing.freeze_support()  # Required on Windows
 
-    trnexe = TRNExe()
-    dck_proc = DCK_processor()
-    dck_list = run_OptionParser(trnexe, dck_proc)
-    dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
-    dck_proc.report_errors(dck_list)
+    try:
+        trnexe = TRNExe()
+        dck_proc = DCK_processor()
+        dck_list = run_OptionParser(trnexe, dck_proc)
+        dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
+        dck_proc.report_errors(dck_list)
+    except Exception as ex:
+        logging.error(str(ex))
 
     input('\nPress the enter key to exit.')
