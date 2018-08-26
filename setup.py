@@ -126,8 +126,14 @@ setup(
                                         ],
                            }},
     version=version,
-    description='Parallelized TRNSYS simulation with Python',
     executables=[Executable('trnpy.py', base=None, icon='res/icon.ico')],
+    description='Parallelized TRNSYS simulation with Python',
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    license='BSD-3-Clause',
+    author='Joris Nettelstroth',
+    author_email='joris.nettelstroth@stw.de',
+    url='https://bitbucket.org/joris_nettelstroth/trnpy',
 )
 
 # Remove some more specific folders:
