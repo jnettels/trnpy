@@ -213,3 +213,136 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
             port += 1  # Increment port number for the next try
         else:  # try was successful, no SystemExit was raised
             port_blocked = False
+
+
+def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
+                   tol=0.001, random_state=1, plots_show=False,
+                   plots_dir=r'.\Result', **skopt_kwargs):
+    '''Perform optimization for a TRNSYS-Simulation with scikit-optimize.
+    https://scikit-optimize.github.io/#skopt.Optimizer
+
+    The "ask and tell" API of scikit-optimize exposes functionality that
+    allows to obtain multiple points for evaluation in parallel. Intended
+    usage of this interface is as follows:
+        1. Initialize instance of the Optimizer class from skopt
+        2. Obtain n points for evaluation in parallel by calling the ask
+           method of an optimizer instance with the n_points argument set
+           to n > 0
+        3. Evaluate points
+        4. Provide points and corresponding objectives using the tell
+           method of an optimizer instance
+        5. Continue from step 2 until eg maximum number of evaluations
+           reached
+
+    Description copied from here, where more info can be found:
+    https://scikit-optimize.github.io/notebooks/parallel-optimization.html
+
+    This function implements the description above, except for step "3.
+    Evaluate points". A function ``eval_func`` for this has to be
+    provided by the user.
+
+    Args:
+        eval_func (function): Evaluation function. Must take a
+        ``param_table`` as input, perform TRNSYS simulations, read
+        simulation results, and return a list of function results,
+        which are to be minimized.
+
+        opt_dimensions (dict): Dictionary with pairs of parameter name
+        (as defined in TRNSYS deck) and space dimensions (boundaries as
+        defined in skopt.Optimizer, typically a ``(lower_bound,
+        upper_bound)`` tuple).
+
+        n_calls (int, default=100): Maximum number of calls to
+        ``eval_func``.
+
+        n_cores (int, optional): Number of CPU cores to use in parallel,
+        defaults to total number of cores minus 1.
+
+        random_state (int or None, optional):
+        Set random state to something other than None for reproducible
+        results. Default = 1.
+
+        plots_show (bool, optional): Show evaluations and dimensions
+        plots provided by skopt.plots. Default = False.
+
+        plots_dir (str, optional): Directory to save skopt.plots into. If
+        ``None``, no plots are saved. Default is ``".\Result"``
+
+        skop_kwargs: Optional keyword arguments that are passed on to
+        skopt.Optimizer, e.g.
+
+            * n_initial_points (int, default=10):
+              Number of evaluations of `func` with random initialization
+              points before approximating it with `base_estimator`.
+
+            * See more: https://scikit-optimize.github.io/#skopt.Optimizer
+
+    Returns:
+        opt_res (OptimizeResult, scipy object): The optimization result
+        returned as a ``OptimizeResult`` object.
+    '''
+
+    if n_cores == 0:
+        n_cores = multiprocessing.cpu_count() - 1
+
+    sk_optimizer = skopt.Optimizer(
+        dimensions=opt_dimensions.values(),
+        random_state=random_state,
+        **skopt_kwargs,
+    )
+
+    for count in range(1, n_calls):
+        logging.info('Optimizer: Starting iteration round '+str(count))
+        next_x = sk_optimizer.ask(n_points=n_cores)  # points to evaluate
+        param_table = pd.DataFrame.from_records(
+                next_x, columns=opt_dimensions.keys())
+        next_y = eval_func(param_table)  # evaluate points in parallel
+        result = sk_optimizer.tell(next_x, next_y)
+        result.nit = count*n_cores
+        result.labels = list(opt_dimensions.keys())
+
+        if result.fun < tol:
+            result.success = True
+            break
+        else:
+            result.success = False
+
+        try:
+            kill_file = 'kill.yaml'
+            kill_dict = yaml.load(open(kill_file, 'r'))
+            if kill_dict.get('kill', False):
+                logging.critical('Optimizer: Killed by kill file...')
+                kill_dict['kill'] = False
+                yaml.dump(kill_dict, open(kill_file, 'w'),
+                          default_flow_style=False)
+                break
+        except Exception:
+            pass
+
+    logging.info('Optimizer: Best fit after '+str(count)+' rounds: '
+                 + str(result.fun))
+
+    # Generate, show and save optimization result plots:
+    if result.space.n_dims > 1:
+        plots_dir = os.path.abspath(plots_dir)
+        if plots_dir is not None and not os.path.exists(plots_dir):
+            os.makedirs(plots_dir)
+
+        skopt.plots.plot_evaluations(result, dimensions=result.labels)
+        if plots_dir is not None:
+            plt.savefig(os.path.join(plots_dir, r'skopt_evaluations.png'),
+                        bbox_inches='tight')
+        try:  # plot_objective might fail
+            skopt.plots.plot_objective(result, dimensions=result.labels)
+        except IndexError as ex:
+            logging.error('Error "' + str(ex) + '". Probably not enough ' +
+                          'data to plot partial dependence')
+        else:
+            if plots_dir is not None:
+                plt.savefig(os.path.join(plots_dir, r'skopt_objective.png'),
+                            bbox_inches='tight')
+
+        if plots_show is True:
+            plt.show()
+
+    return result
