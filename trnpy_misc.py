@@ -27,6 +27,9 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.palettes import Spectral11 as palette_default
 
+# Define the logging function
+logger = logging.getLogger(__name__)
+
 
 def df_to_excel(df, path):
     '''Wrapper around pandas' function DataFrame.to_excel(), which creates
@@ -187,15 +190,15 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 
     # Prepare settings:
     data_file = os.path.join(bokeh_app, 'upload', data_name + '.xlsx')
-    logging.info('Saving file for DataExplorer... ')
-    logging.info(data_file)
-    if logging.getLogger().isEnabledFor(logging.INFO):
+    logger.info('Saving file for DataExplorer... ')
+    logger.info(data_file)
+    if logger.isEnabledFor(logging.INFO):
         print(DatEx_df.head())
 
     # Save this as a file that DataExplorer will load again
     DatEx_df.to_excel(data_file, merge_cells=False)
 
-    logging.info('Starting DataExplorer...')
+    logger.info('Starting DataExplorer...')
 
     port_blocked = True
     while port_blocked:
@@ -292,7 +295,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     )
 
     for count in range(1, n_calls):
-        logging.info('Optimizer: Starting iteration round '+str(count))
+        logger.info('Optimizer: Starting iteration round '+str(count))
         next_x = sk_optimizer.ask(n_points=n_cores)  # points to evaluate
         param_table = pd.DataFrame.from_records(
                 next_x, columns=opt_dimensions.keys())
@@ -311,7 +314,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             kill_file = 'kill.yaml'
             kill_dict = yaml.load(open(kill_file, 'r'))
             if kill_dict.get('kill', False):
-                logging.critical('Optimizer: Killed by kill file...')
+                logger.critical('Optimizer: Killed by kill file...')
                 kill_dict['kill'] = False
                 yaml.dump(kill_dict, open(kill_file, 'w'),
                           default_flow_style=False)
@@ -319,8 +322,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         except Exception:
             pass
 
-    logging.info('Optimizer: Best fit after '+str(count)+' rounds: '
-                 + str(result.fun))
+    logger.info('Optimizer: Best fit after '+str(count)+' rounds: '
+                + str(result.fun))
 
     # Generate, show and save optimization result plots:
     if result.space.n_dims > 1:
@@ -335,8 +338,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         try:  # plot_objective might fail
             skopt.plots.plot_objective(result, dimensions=result.labels)
         except IndexError as ex:
-            logging.error('Error "' + str(ex) + '". Probably not enough ' +
-                          'data to plot partial dependence')
+            logger.error('Error "' + str(ex) + '". Probably not enough ' +
+                         'data to plot partial dependence')
         else:
             if plots_dir is not None:
                 plt.savefig(os.path.join(plots_dir, r'skopt_objective.png'),
@@ -346,3 +349,11 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             plt.show()
 
     return result
+
+
+if __name__ == "__main__":
+    '''This is executed when the script is started directly with
+    Python, not when it is loaded as a module.
+    '''
+    # Define output format of logging function
+    logging.basicConfig(format='%(asctime)-15s %(message)s')

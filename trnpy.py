@@ -120,6 +120,9 @@ from tkinter import Tk, filedialog
 # Default values that are used by multiple classes:
 regex_result_files_def = r'Result|\.sum|\.pr.'
 
+# Define the logging function
+logger = logging.getLogger(__name__)
+
 
 class TRNExe(object):
     '''The TRNExe class.
@@ -174,16 +177,16 @@ class TRNExe(object):
         proc = subprocess.Popen([self.path_TRNExe, dck.file_path_dest,
                                  mode_trnsys])
 
-        logging.debug('TRNSYS started with PID ' + str(proc.pid) +
-                      ' ('+dck.file_path_dest+')')
+        logger.debug('TRNSYS started with PID ' + str(proc.pid) +
+                     ' ('+dck.file_path_dest+')')
 
         # Wait until the process is finished
         while proc.poll() is None:
             # While we wait, we check if TRNSYS is still running
             if self.TRNExe_is_alive(proc.pid) is False:
-                logging.debug('TRNSYS is inactive and may have encountered '
-                              'an error, killing the process in 10 seconds: ' +
-                              dck.file_path_dest)
+                logger.debug('TRNSYS is inactive and may have encountered '
+                             'an error, killing the process in 10 seconds: ' +
+                             dck.file_path_dest)
                 time.sleep(10)
                 proc.terminate()
                 dck.error_msg_list.append('Low CPU load - timeout')
@@ -192,9 +195,9 @@ class TRNExe(object):
         # Check for error messages in the log and store them in the deck object
         if self.check_log_for_errors(dck) is False or dck.success is False:
             dck.success = False
-            logging.debug('Finished PID ' + str(proc.pid) + ' with errors')
+            logger.debug('Finished PID ' + str(proc.pid) + ' with errors')
         else:
-            logging.debug('Finished PID ' + str(proc.pid))
+            logger.debug('Finished PID ' + str(proc.pid))
             dck.success = True
         # Return the deck object
         return dck
@@ -283,8 +286,8 @@ class TRNExe(object):
             if n_cores == 0:
                 n_cores = min(multiprocessing.cpu_count() - 1, len(dck_list))
 
-            logging.info('Parallel processing of ' + str(len(dck_list)) +
-                         ' jobs on ' + str(n_cores) + ' cores')
+            logger.info('Parallel processing of ' + str(len(dck_list)) +
+                        ' jobs on ' + str(n_cores) + ' cores')
             pool = multiprocessing.Pool(n_cores)
 
             '''For short lists, imap seemed the fastest option.
@@ -304,7 +307,7 @@ class TRNExe(object):
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
         script_time = str(script_time).split('.')[0]
-        logging.info('Finished all simulations in time: %s' % (script_time))
+        logger.info('Finished all simulations in time: %s' % (script_time))
 
         return returned_dck_list
 
@@ -428,10 +431,10 @@ class DCK(object):
                 self.result_files.append(file)
 
         if len(self.result_files) == 0:
-            logging.warning('No result files were identified among the '
-                            'assigned files in the deck '+self.file_name+'. '
-                            'This may cause issues. Is this regular expression'
-                            ' correct? "'+self.regex_result_files+'"')
+            logger.warning('No result files were identified among the '
+                           'assigned files in the deck '+self.file_name+'. '
+                           'This may cause issues. Is this regular expression'
+                           ' correct? "'+self.regex_result_files+'"')
 
 
 class DCK_processor(object):
@@ -505,8 +508,8 @@ class DCK_processor(object):
         '''
         parametric_table = self.read_filetypes(param_table_file)
 
-        logging.info(param_table_file+':')
-        if logging.getLogger().isEnabledFor(logging.INFO):
+        logger.info(param_table_file+':')
+        if logger.isEnabledFor(logging.INFO):
             print(parametric_table)
 
         return parametric_table
@@ -525,8 +528,8 @@ class DCK_processor(object):
         combis = [dict(items) for items in itertools.product(*flat)]
         parametric_table = pd.DataFrame.from_dict(combis)
 
-        logging.info('Parametric table from combinations:')
-        if logging.getLogger().isEnabledFor(logging.INFO):
+        logger.info('Parametric table from combinations:')
+        if logger.isEnabledFor(logging.INFO):
             print(parametric_table)
 
         return parametric_table
@@ -559,8 +562,8 @@ class DCK_processor(object):
                              encoding='WINDOWS-1252',  # TRNSYS encoding
                              **kwargs)
         elif filetype in ['.dat', '.txt']:
-            logging.warning('Unsupported file extension: ' + filetype +
-                            '. Trying to read it like a csv file.')
+            logger.warning('Unsupported file extension: ' + filetype +
+                           '. Trying to read it like a csv file.')
             df = pd.read_csv(filepath, **kwargs)
         else:
             raise NotImplementedError('Unsupported file extension: "' +
@@ -756,8 +759,8 @@ class DCK_processor(object):
                                                             re_replace,
                                                             dck.dck_text)
                 if number_of_subs_made == 0 and print_warnings:
-                    logging.warning('Warning: Replacement not successful, ' +
-                                    'because regex was not found: '+re_find)
+                    logger.warning('Warning: Replacement not successful, ' +
+                                   'because regex was not found: '+re_find)
 
         return
 
@@ -784,8 +787,8 @@ class DCK_processor(object):
             for file in dck.assigned_files:
                 source_file = os.path.join(source_folder, file)
                 destination_file = os.path.join(destination_folder, file)
-#                logging.debug('source      = '+source_file)
-#                logging.debug('destination = '+destination_file)
+#                logger.debug('source      = '+source_file)
+#                logger.debug('destination = '+destination_file)
                 if not os.path.exists(os.path.dirname(destination_file)):
                     os.makedirs(os.path.dirname(destination_file))
 
@@ -793,12 +796,12 @@ class DCK_processor(object):
                     try:
                         shutil.copy2(source_file, destination_file)
                     except Exception as ex:
-                        logging.debug('Error in ' + dck.file_name)
+                        logger.debug('Error in ' + dck.file_name)
                         raise
                 else:
-                    logging.debug(dck.file_name + ': Copy source and ' +
-                                  'destination are equal for file:')
-                    if logging.getLogger().isEnabledFor(logging.DEBUG):
+                    logger.debug(dck.file_name + ': Copy source and ' +
+                                 'destination are equal for file:')
+                    if logger.isEnabledFor(logging.DEBUG):
                         print(source_file)
 
             # For result files, we must create the folders
@@ -815,8 +818,8 @@ class DCK_processor(object):
                     f.write(dck.dck_text)
 
         # Print the list of the created & copied parametric deck files
-        logging.debug('List of copied dck files:')
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logger.debug('List of copied dck files:')
+        if logger.isEnabledFor(logging.DEBUG):
             for dck in dck_list:
                 print(dck.file_path_dest)
 
@@ -907,11 +910,11 @@ class DCK_processor(object):
                     result_data[result_file] = df
 
                 except Exception as ex:
-                    logging.error('Error when trying to read result file "' +
-                                  result_file + '": ' + str(ex))
+                    logger.error('Error when trying to read result file "' +
+                                 result_file + '": ' + str(ex))
 
-        logging.info('Collected result files:')
-        if logging.getLogger().isEnabledFor(logging.INFO):
+        logger.info('Collected result files:')
+        if logger.isEnabledFor(logging.INFO):
             for file in result_data.keys():
                 print(file)
         return result_data
@@ -1024,7 +1027,7 @@ class DCK_processor(object):
                 cols_mean.append(column)
                 cols_found.append(column)
             else:
-                logging.info('Column "'+column+'" did not match the regular '
+                logger.debug('Column "'+column+'" did not match the regular '
                              'expressions and will not be resampled')
 
         if len(df.index.names) == 1:
@@ -1067,7 +1070,7 @@ def file_dialog_dck(initialdir=os.getcwd()):
         paths (List): List of file paths
     '''
     title = 'Please choose a TRNSYS Input File (*.dck)'
-    logging.info(title)
+    logger.info(title)
     root = Tk()
     root.withdraw()
     files = filedialog.askopenfilenames(
@@ -1093,7 +1096,7 @@ def file_dialog_parametrics(initialdir=os.getcwd()):
     '''
     title = 'Choose a parametric table, or cancel to perform '\
             'a regular simulation'
-    logging.info(title)
+    logger.info(title)
     root = Tk()
     root.withdraw()
     file = filedialog.askopenfilename(
@@ -1213,14 +1216,13 @@ def run_OptionParser(TRNExe, dck_proc):
     dck_proc.root_folder = os.path.abspath(args.sim_folder)
     dck_proc.regex_result_files = args.regex_result_files
 
-    # Define the logging function
-    FORMAT = '%(asctime)-15s %(message)s'
-    logging.basicConfig(format=FORMAT, level=args.log_level.upper())
+    # Set level of logging function
+    logger.setLevel(level=args.log_level.upper())
 
     if len(args.dck) == 0:
         dck_file_list = file_dialog_dck()
         if dck_file_list is None:
-            logging.info('Empty selection. Show help and exit program...')
+            logger.info('Empty selection. Show help and exit program...')
             parser.print_help()
             input('\nPress the enter key to exit.')
             raise SystemExit
@@ -1228,8 +1230,8 @@ def run_OptionParser(TRNExe, dck_proc):
         # Get list of deck files (and convert relative into absolute paths)
         dck_file_list = [os.path.abspath(dck_file) for dck_file in args.dck]
 
-    logging.debug('List of dck files:')
-    if logging.getLogger().isEnabledFor(logging.DEBUG):
+    logger.debug('List of dck files:')
+    if logger.isEnabledFor(logging.DEBUG):
         for dck_file in dck_file_list:
             print(dck_file)
 
@@ -1265,6 +1267,9 @@ if __name__ == "__main__":
     '''
     multiprocessing.freeze_support()  # Required on Windows
 
+    # Define output format of logging function
+    logging.basicConfig(format='%(asctime)-15s %(message)s')
+
     try:
         trnexe = TRNExe()
         dck_proc = DCK_processor()
@@ -1272,6 +1277,6 @@ if __name__ == "__main__":
         dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
         dck_proc.report_errors(dck_list)
     except Exception as ex:
-        logging.error(str(ex))
+        logger.exception(ex)
 
     input('\nPress the enter key to exit.')
