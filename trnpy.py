@@ -859,9 +859,10 @@ class DCK_processor(object):
                     df_new = read_file_function(result_file_path)
 
                     # Add the 'hash' and all the key, value pairs to DataFrame
-                    df_new['hash'] = [dck.hash]*len(df_new)
+                    df_new['hash'] = dck.hash
+                    df_new['success'] = dck.success  # Store simulation success
                     for key, value in dck.replace_dict.items():
-                        df_new[key] = [value]*len(df_new)
+                        df_new[key] = value
 
                     # Add the DataFrame to the dict of result files
                     if result_file in result_data.keys():
