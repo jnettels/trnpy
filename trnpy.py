@@ -616,32 +616,53 @@ class DCK_processor(object):
         return dck_list
 
     def add_replacements(self, replace_dict_new, dck):
-        '''Add new entries to the existing replace_dict.
+        '''Add new entries to the existing replace_dict of a dck object.
         Basic use is to add strings, but also accepts regular expressions.
         These allow you to replace any kind of information.
+
+        .. note::
+            If a list of dck objects is given, the function is applied to
+            all of them.
 
         Args:
             replace_dict_new (dict): Dictionary of 'str_old: string_new' pairs
 
+            dck (DCK object or list): dck object(s) to add replacements to.
+
         Returns:
             None
         '''
-        for re_find, re_replace in replace_dict_new.items():
-            dck.regex_dict[re_find] = re_replace
+        import collections
+
+        if isinstance(dck, collections.Sequence) and not isinstance(dck, str):
+            for dck_obj in dck:  # Call this function recursively for each dck
+                self.add_replacements(replace_dict_new, dck_obj)
+        else:
+            for re_find, re_replace in replace_dict_new.items():
+                dck.regex_dict[re_find] = re_replace
 
     def add_replacements_value_of_key(self, replace_dict_new, dck):
-        '''Add new entries to the existing replace_dict.
+        '''Add new entries to the existing replace_dict of a dck object.
         Creates the required regular expression to replace the 'value' of the
         'key' in the deck file. Then calls add_replacements().
 
+        .. note::
+            If a list of dck objects is given, the function is applied to
+            all of them.
+
         Args:
             replace_dict_new (dict): Dictionary of 'key: value' pairs
+
+            dck (DCK object or list): dck object(s) to add replacements to.
 
         Returns:
             None
 
         Example:
-            replace_dict_new = {'A_Koll': 550, 'plot_on_off': -1}
+            .. code::
+
+                replace_dict_new = {'A_Koll': 550,
+                                    'plot_on_off': -1}
         '''
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
@@ -740,12 +761,23 @@ class DCK_processor(object):
 
         return
 
-    def copy_assigned_files(self, dck_list):
+    def copy_assigned_files(self, dck_list, find_files=False):
         '''All external files that a TRNSYS deck depends on are stored with
         the ASSIGN parameter. We make a list of those files and copy them
         to the required location. (Weather data, load profiles, etc.)
+
+        Args:
+            dck_list (list): List of ``dck`` objects to work on
+
+            find_files (bool, optional): Perform ``find_assigned_files()``
+            before doing the copy. Default is False.
+
+        Returns:
+            None
         '''
         for dck in dck_list:
+            if find_files:  # update 'dck.assigned_files'
+                dck.find_assigned_files()  # search deck text for file paths
             # Copy the assigned files
             source_folder = os.path.dirname(dck.file_path_orig)
             destination_folder = os.path.dirname(dck.file_path_dest)
