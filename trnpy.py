@@ -138,7 +138,8 @@ class TRNExe(object):
                  path_TRNExe=r'C:\Trnsys17\Exe\TRNExe.exe',
                  mode_trnsys_hidden=False,
                  mode_exec_parallel=False,
-                 n_cores=0
+                 n_cores=0,
+                 check_vital_sign=True,
                  ):
         '''
         The optional argument n_cores allows control over the used CPU cores.
@@ -147,13 +148,18 @@ class TRNExe(object):
         necessarily make total simulation time faster.
 
         Args:
-            path_TRNExe (str): Path to the actual TRNSYS executable
+            path_TRNExe (str, optional): Path to the actual TRNSYS executable
 
             mode_trnsys_hidden (bool): Run simulations completely hidden?
 
             mode_exec_parallel (bool): Run simulations in parallel?
 
             n_cores (int, optional): Number of CPU cores to use in parallel
+
+            check_vital_sign (bool, optional): If ``False``, the check
+            ``TRNExe_is_alive()`` is skipped. This is useful if you want to be
+            able to pause the live plotter during a simulation.
+            Default is ``True``.
 
         Returns:
             None
@@ -162,6 +168,7 @@ class TRNExe(object):
         self.mode_trnsys_hidden = mode_trnsys_hidden
         self.mode_exec_parallel = mode_exec_parallel
         self.n_cores = n_cores
+        self.check_vital_sign = check_vital_sign
 
     def run_TRNSYS_dck(self, dck):
         '''Run a TRNSYS simulation with the given deck dck_file.
@@ -247,6 +254,9 @@ class TRNExe(object):
         Returns:
             True/False (bool): Status information
         '''
+        if self.check_vital_sign is False:
+            return True  # Skip the check if the user demands it
+
         try:
             # The process might have finished by the time we get to check
             # its status. This would cause an error.
