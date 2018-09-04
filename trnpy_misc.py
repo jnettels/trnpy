@@ -31,26 +31,67 @@ from bokeh.palettes import Spectral11 as palette_default
 logger = logging.getLogger(__name__)
 
 
-def df_to_excel(df, path):
-    '''Wrapper around pandas' function DataFrame.to_excel(), which creates
+def df_to_excel(df, path, sheet_names=[], merge_cells=False, **kwargs):
+    '''Wrapper around pandas' function ``DataFrame.to_excel()``, which creates
     the required directory and only logs any errors instead of terminating
     the script (happens often when the Excel file is currently opended).
+    Additional keyword arguments are passed down to ``to_excel()``.
+    Can save a single DataFrame to a single Excel file or multiple DataFrames
+    to a combined Excel file.
+
 
     Args:
-        df (DataFrame): Pandas DataFrame object to save
+        df (DataFrame or list): Pandas DataFrame object(s) to save
 
         path (str): The full file path to save the DataFrame to
+
+        sheet_names (list): List of sheet names to use when saving multiple
+        DataFrames to the same Excel file
+
+        merge_cells (boolean, optional): Write MultiIndex and Hierarchical
+        Rows as merged cells. Default False.
+
+        freeze_panes (tuple or boolean, optional): Per default, the sheet
+        cells are frozen to always keep the index visible (by determining the
+        correct coordinate ``tuple``). Use ``False`` to disable this.
 
     Returns:
         None
     '''
+    import collections
+
     if not os.path.exists(os.path.dirname(path)):
         logging.debug('Create directory ' + os.path.dirname(path))
         os.makedirs(os.path.dirname(path))
+
     try:
-        df.to_excel(path)
+        if isinstance(df, collections.Sequence) and not isinstance(df, str):
+            # Save a list of DataFrame objects into a single Excel file
+            writer = pd.ExcelWriter(path)
+            for i, df_ in enumerate(df):
+                try:  # Use given sheet name, or just an enumeration
+                    sheet = sheet_names[i]
+                except IndexError:
+                    sheet = str(i)
+                # Add current sheet to the ExcelWriter by calling this
+                # function recursively
+                df_to_excel(df=df_, path=writer, sheet_name=sheet,
+                            merge_cells=merge_cells, **kwargs)
+            writer.save()  # Save the actual Excel file
+
+        else:
+            # Per default, the sheet cells are frozen to keep the index visible
+            if 'freeze_panes' not in kwargs or kwargs['freeze_panes'] is True:
+                # Find the right cell to freeze in the Excel sheet
+                kwargs['freeze_panes'] = (1, len(df.index.names))
+            elif kwargs['freeze_panes'] is False:
+                del(kwargs['freeze_panes'])
+
+            # Save one DataFrame to one Excel file
+            df.to_excel(path, merge_cells=merge_cells, **kwargs)
+
     except Exception as ex:
-        logging.debug(str(ex))
+        logging.exception(ex)
         pass
 
 
@@ -117,7 +158,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
         hover = HoverTool(tooltips=[(label, "@{"+label+"}"), *tips_list],
                           renderers=[r])
         p.add_tools(hover)
-     # Bokeh 0.13.0: Use $name field
+    # Bokeh 0.13.0: Use $name field
 #    tips_list = [(col, "@{"+col+"}") for col in param_table.columns]
 #    hover = HoverTool(tooltips=[("$name ", "@$name"), *tips_list])
 #    p.add_tools(hover)
