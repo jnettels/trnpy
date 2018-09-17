@@ -853,7 +853,8 @@ class DCK_processor(object):
                 print('')  # Finish with an empty line
         return
 
-    def results_collect(self, dck_list, read_file_function, create_index=True):
+    def results_collect(self, dck_list, read_file_function, create_index=True,
+                        origin=None):
         '''Collect the results of the simulations. Our goal is to combine
         the result files of the parametric runs into DataFrames. The DataFrames
         contain the raw data plus columns for each of the replacements made
@@ -889,6 +890,9 @@ class DCK_processor(object):
             create_index (bool, optional): Move time and parameter columns to
             the index of the DataFrame. Default: True
 
+            origin (str, optional): Start date for index (``'2003-01-01'``).
+            Used if ``create_index=True``. Default is start of current year.
+
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         '''
@@ -904,7 +908,8 @@ class DCK_processor(object):
                     df_new = read_file_function(result_file_path)
 
                     # Add the 'hash' and all the key, value pairs to DataFrame
-                    df_new['hash'] = dck.hash
+                    if dck.hash is not None:
+                        df_new['hash'] = dck.hash
                     df_new['success'] = dck.success  # Store simulation success
                     for key, value in dck.replace_dict.items():
                         df_new[key] = value
@@ -927,26 +932,43 @@ class DCK_processor(object):
         if logger.isEnabledFor(logging.INFO):
             for file in result_data.keys():
                 print(file)
+
+        if create_index:
+            result_data = self.results_create_index(result_data, origin=origin,
+                                                    replace_dict=dck_list[0]
+                                                    .replace_dict)
+
         return result_data
 
-    def results_create_index(self, result_data, replace_dict, origin):
+    def results_create_index(self, result_data, replace_dict={}, origin=None):
         '''Put the time and parameter columns into the index of the DataFrame.
-        The function expects the return of results_collect(). This typically
-        creates a multi-index and is arguably how DataFrames are supposed to
-        be handled.
+        The function expects the return of ``results_collect()``. This
+        typically creates a multi-index and is arguably how DataFrames are
+        supposed to be handled.
 
         Args:
             result_data (dict): The return of the function results_collect()
 
-            replace_dict (dict): Is required to identify the parameter columns
+            replace_dict (dict): Is required to identify the parameter columns.
+            Just use the replace_dict stored in one of your dck objects, e.g.
 
-            origin (str): Start date, e.g. '2003-01-01'. TRNSYS does not care
-            for years or days, but to get a pretty DataFrame we use datetime
-            for the time column, which needs a fully defined date.
+            .. code::
+
+                replace_dict = dck_list[0].replace_dict
+
+            origin (str, optional): Start date, e.g. ``'2003-01-01'``.
+            TRNSYS does not care for years or days, but to get a pretty
+            DataFrame we use datetime for the time column, which needs a
+            fully defined date. Defaults to start of the current year.
 
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         '''
+        import datetime
+
+        if origin is None:
+            origin = datetime.date.today().replace(month=1, day=1)
+
         for key, df in result_data.items():
             if 'TIME' in df.columns:
                 t_col = 'TIME'
@@ -960,8 +982,13 @@ class DCK_processor(object):
                                        origin=pd.Timestamp(origin))
 
             # Create a list and use that as the new index columns
-            idx_cols = ['hash'] + list(replace_dict.keys()) + [t_col]
-            df.set_index(keys=idx_cols, inplace=True)
+            try:  # Try to create an index including 'hash'
+                idx_cols = ['hash'] + list(replace_dict.keys()) + [t_col]
+                df.set_index(keys=idx_cols, inplace=True)
+            except KeyError:
+                idx_cols = list(replace_dict.keys()) + [t_col]
+                df.set_index(keys=idx_cols, inplace=True)
+
             df.sort_index(inplace=True)
 
         return result_data

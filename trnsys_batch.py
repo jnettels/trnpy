@@ -92,14 +92,11 @@ def trnsys_batch_example_01(dck_file):
 
     # Collect the results of the simulations. Our goal is to combine
     # the result files of the parametric runs into DataFrames.
-    result_data = dck_proc.results_collect(dck_list, read_file_function)
-
     # Put the time and parameter columns into the index of the DataFrame.
 #    data_start_date = '2003-01-01'
     data_start_date = '2005-01-01'
-    result_data = dck_proc.results_create_index(result_data,
-                                                dck_list[0].replace_dict,
-                                                data_start_date)
+    result_data = dck_proc.results_collect(dck_list, read_file_function,
+                                           origin=data_start_date)
 
     # Now we have got all the results in memory. We can call them by their file
     # paths (as assigned in TRNSYS).
