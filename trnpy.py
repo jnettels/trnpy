@@ -390,7 +390,7 @@ class DCK(object):
         self.success = None
         self.hash = None
         self.replace_dict = dict()
-        self.regex_dict = dict()
+        self.regex_dict = dict()  # Regular expressions used for replacements
         self.regex_result_files = regex_result_files
         self.dck_text = ''
 
@@ -593,6 +593,9 @@ class DCK_processor(object):
         * ``dck_proc.copy_assigned_files(dck_list)``
 
         But you can manualy add other replacements before that, if required.
+        ``parametric_table`` may also be an DataFrame with nothing but an
+        index. This way you can define the unique indentifier ``hash`` used
+        for each dck and perform more complex replacements manually.
 
         Args:
             parametric_table (DataFrame): Pandas DataFrame with parameters
@@ -695,9 +698,11 @@ class DCK_processor(object):
             self.add_replacements({re_find: re_replace}, dck)
 
     def reset_replacements(self, dck):
-        '''Reset the replace_dict to make it empty.
+        '''Reset all previous replacements by making ``replace_dict`` and
+        ``regex_dict`` empty.
         '''
         dck.replace_dict = dict()
+        dck.regex_dict = dict()
 
     def create_dcks_from_file_list(self, dck_file_list, update_dest=False,
                                    copy_files=False):
