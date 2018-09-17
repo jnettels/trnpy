@@ -20,8 +20,6 @@ import multiprocessing
 import matplotlib.pyplot as plt  # Plotting library
 import pandas as pd
 import yaml
-import skopt
-from skopt.plots import plot_evaluations, plot_objective
 from bokeh.command.bootstrap import main
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource
@@ -261,7 +259,8 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 
 def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    tol=0.001, random_state=1, plots_show=False,
-                   plots_dir=r'.\Result', **skopt_kwargs):
+                   plots_dir=r'.\Result', load_optimizer_pickle_file=None,
+                   **skopt_kwargs):
     '''Perform optimization for a TRNSYS-Simulation with scikit-optimize.
     https://scikit-optimize.github.io/#skopt.Optimizer
 
@@ -312,6 +311,10 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         plots_dir (str, optional): Directory to save skopt.plots into. If
         ``None``, no plots are saved. Default is ``".\Result"``
 
+        load_optimizer_pickle_file (str, optional): A path to an optimizer
+        instance dumped before with pickle. This allows to continue a
+        previous optimization process. Default is ``None``.
+
         skop_kwargs: Optional keyword arguments that are passed on to
         skopt.Optimizer, e.g.
 
@@ -325,19 +328,35 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         opt_res (OptimizeResult, scipy object): The optimization result
         returned as a ``OptimizeResult`` object.
     '''
+    import skopt
+    from skopt.plots import plot_evaluations, plot_objective
+    import pickle
 
-    if n_cores == 0:
+    if n_cores == 0:  # Set number of CPU cores to use
         n_cores = multiprocessing.cpu_count() - 1
 
-    sk_optimizer = skopt.Optimizer(
-        dimensions=opt_dimensions.values(),
-        random_state=random_state,
-        **skopt_kwargs,
-    )
+    if load_optimizer_pickle_file is not None:
+        # Load an existing optimizer instance
+        with open(load_optimizer_pickle_file, 'rb') as f:
+            sk_optimizer = pickle.load(f)
+            logger.info('Optimizer: Loaded existing optimizer instance '
+                        + load_optimizer_pickle_file)
+    else:
+        # Default behaviour: Start fresh with a new optimizer instance
+        sk_optimizer = skopt.Optimizer(
+            dimensions=opt_dimensions.values(),
+            random_state=random_state,
+            **skopt_kwargs,
+        )
 
-    for count in range(1, n_calls):
+    # Start the optimization loop
+    for count in range(1, n_calls+1):
         logger.info('Optimizer: Starting iteration round '+str(count))
-        next_x = sk_optimizer.ask(n_points=n_cores)  # points to evaluate
+        try:
+            next_x = sk_optimizer.ask(n_points=n_cores)  # points to evaluate
+        except ValueError as ex:
+            logger.exception(ex)
+            continue
         param_table = pd.DataFrame.from_records(
                 next_x, columns=opt_dimensions.keys())
         next_y = eval_func(param_table)  # evaluate points in parallel
@@ -351,6 +370,17 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         else:
             result.success = False
 
+        # Save intermediate results after each round as pickle objects
+        if plots_dir is not None and not os.path.exists(plots_dir):
+            os.makedirs(plots_dir)
+        if plots_dir is not None:
+            with open(os.path.join(plots_dir, 'optimizer.pkl'), 'wb') as f:
+                pickle.dump(sk_optimizer, f)
+            with open(os.path.join(plots_dir, 'opt_result.pkl'), 'wb') as f:
+                pickle.dump(result, f)
+
+        # A yaml file in the current working directory allows to stop
+        # the optimization and proceed with the program
         try:
             kill_file = 'kill.yaml'
             kill_dict = yaml.load(open(kill_file, 'r'))
