@@ -1087,10 +1087,18 @@ class DCK_processor(object):
             slice_list = [slice(None)]*(n_index_cols-1) + [slice(start, end)]
             slices = tuple(slice_list)  # Convert list to tuple
             df_new = df.loc[slices, :]  # Slice multiindex
+
+        if len(df_new.index) == 0:
+            logger.error('After slicing from '+str(start)+' to '+str(end)
+                         + ', data is empty! Returning original data, which '
+                         + 'ranges from '
+                         + str(df.index.min())+' to '+str(df.index.max()))
+            return df
+
         return df_new
 
     def results_resample(self, df, freq, regex_sum=r'Q_|E_',
-                         regex_mean=r'T_|M_', **kwargs):
+                         regex_mean=r'T_|M_', prio='sum', **kwargs):
         '''Resample a multi-indexed DataFrame to a new frequency.
         Expects the time column to be at last position in the multi-index.
         Columns not matched by the regular expressions will be dropped with
@@ -1113,6 +1121,10 @@ class DCK_processor(object):
             regex_mean (str): Regular expression that matches all names of
             columns that should use the mean (e.g. temperatures)
 
+            prio (str, optional): Set to ``"sum"`` (default) or ``"mean"`` to
+            prioritise that regular expression. If a column fits to one regex,
+            the other regex is not checked.
+
         kwargs:
             Additional keyword arguments, can be used to pass ``"closed"``
             and/or ``"label"`` (each with the values ``"left"`` or ``"right"``)
@@ -1126,12 +1138,20 @@ class DCK_processor(object):
         cols_mean = []
         cols_found = []
         for column in df.columns:
-            if re.search(regex_sum, column):
-                cols_sum.append(column)
-                cols_found.append(column)
-            elif re.search(regex_mean, column):
-                cols_mean.append(column)
-                cols_found.append(column)
+            if prio == 'sum':
+                if re.search(regex_sum, column):
+                    cols_sum.append(column)
+                    cols_found.append(column)
+                elif re.search(regex_mean, column):
+                    cols_mean.append(column)
+                    cols_found.append(column)
+            if prio == 'mean':
+                if re.search(regex_mean, column):
+                    cols_mean.append(column)
+                    cols_found.append(column)
+                elif re.search(regex_sum, column):
+                    cols_sum.append(column)
+                    cols_found.append(column)
             else:
                 logger.debug('Column "'+column+'" did not match the regular '
                              'expressions and will not be resampled')
