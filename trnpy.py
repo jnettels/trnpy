@@ -951,6 +951,19 @@ class DCK_processor(object):
         typically creates a multi-index and is arguably how DataFrames are
         supposed to be handled.
 
+        .. note::
+            TRNSYS simulations do not take leap years into account. Therefore
+            we try to create an index without any February 29. If processed
+            further, e.g. when resampling to weeks, this will be interpreted
+            like a day with all entries equal to zero. Thus the week
+            including 29.2. will have a lower energy sum. This is irritating,
+            but better than the alternative, where 29.2. is filled with data
+            but now the last day of the year is missing.
+
+            The approach only works for simulations of one or multiple
+            complete years). If this fails, a basic approach including 29.2.
+            is used instead.
+
         Args:
             result_data (dict): The return of the function results_collect()
 
@@ -971,8 +984,10 @@ class DCK_processor(object):
         '''
         import datetime
 
-        if origin is None:
+        if origin is None:  # Create default datetime object
             origin = datetime.date.today().replace(month=1, day=1)
+        else:
+            origin = pd.Timestamp(origin)  # Convert string to datetime object
 
         for key, df in result_data.items():
             if 'TIME' in df.columns:
@@ -981,10 +996,49 @@ class DCK_processor(object):
                 t_col = 'Time'
             else:
                 continue
-            # Convert TIME column to float and then to datetime
+            # Convert TIME column to float
             df[t_col] = [float(string) for string in df[t_col]]
-            df[t_col] = pd.to_datetime(df[t_col], unit='h',
-                                       origin=pd.Timestamp(origin))
+
+            # Convert the TIME float column to the datetime format
+            try:
+                # Approach where leap year days are not included in the
+                # resulting datetime column. This will fail if simulation
+                # did not run for one or multiple complete years.
+
+                # df is already the combined DataFrame of all simulations.
+                # Find the length of the longest simulation
+                n_hours = max(df[t_col])
+
+                # Check if data is suited for this approach
+                if n_hours % 8760 != 0 or len(df[t_col]) % n_hours != 0:
+                    raise ValueError('Simulation data length is not one or '
+                                     + 'multiple complete years (8760 hours).'
+                                     + ' Cannot remove leap year days.')
+
+                n_years = int(n_hours/8760)  # Number of years per simulation
+                n_sim = int(len(df[t_col])/n_hours)  # Number of simulations
+
+                # Create date range, with the correct start and end date
+                end_date = origin.replace(year=origin.year + n_years)
+                dr = pd.date_range(start=origin + pd.Timedelta('1 hours'),
+                                   end=end_date, freq='H')
+                # Remove leap year days from the date range
+                dr = dr[~((dr.month == 2) & (dr.day == 29))]
+
+                # Copy the date range for each simulation
+                dr_copy = dr.copy()
+                for n in range(n_sim - 1):
+                    dr_copy = dr_copy.append(dr)
+                df[t_col] = dr_copy  # Insert the date range into the DataFrame
+
+            except Exception as ex:
+                logger.exception(ex)
+                logger.critical('Creating datetime index without removing '
+                                + 'leap year days.')
+
+                # "Safer" way of converting the float TIME column to datetime.
+                # However, this creates a 29.2. in all leap years
+                df[t_col] = pd.to_datetime(df[t_col], unit='h', origin=origin)
 
             # Create a list and use that as the new index columns
             try:  # Try to create an index including 'hash'
@@ -995,6 +1049,16 @@ class DCK_processor(object):
                 df.set_index(keys=idx_cols, inplace=True)
 
             df.sort_index(inplace=True)
+
+            # Check if there are leap years in the data:
+            bool_leap = df.index.get_level_values(t_col).is_leap_year
+            if bool_leap.any():
+                df_leap = pd.DataFrame(data=bool_leap, index=df.index,
+                                       columns=['is_leap_year'])
+                df_leap['year'] = df_leap.index.get_level_values(t_col).year
+                df_leap = df_leap[df_leap['is_leap_year']]
+                years = set(df_leap['year'].astype(str))  # Set of unique years
+                logger.warning(key+': Data has leap years '+', '.join(years))
 
         return result_data
 
