@@ -169,12 +169,15 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
 
 
 def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
-                          palette=palette_default):
+                          palette=palette_default, **kwargs):
     '''Create a simple circle plot with Bokeh, where one column ``x_col``
     is plotted against all other columns (or the list ``y_cols``) of a
     Pandas DataFrame.
+
+    Use ``**kwargs`` to pass additional keyword arguments to ``figure()`` like
+    ``plot_width``, etc.
     '''
-    p = figure()
+    p = figure(**kwargs)
     df = df_in.reset_index()  # Remove index
     source = ColumnDataSource(data=df)
 
@@ -260,7 +263,7 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    tol=0.001, random_state=1, plots_show=False,
                    plots_dir=r'.\Result', load_optimizer_pickle_file=None,
-                   **skopt_kwargs):
+                   kill_file='optimizer.yaml', **skopt_kwargs):
     '''Perform optimization for a TRNSYS-Simulation with scikit-optimize.
     https://scikit-optimize.github.io/#skopt.Optimizer
 
@@ -314,6 +317,10 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         load_optimizer_pickle_file (str, optional): A path to an optimizer
         instance dumped before with pickle. This allows to continue a
         previous optimization process. Default is ``None``.
+
+        kill_file (str, optional): A path to a yaml file. If it contains
+        the entry ``kill: True``, the optimization is stopped before the next
+        round. Default is ``"optimizer.yaml"``
 
         skop_kwargs: Optional keyword arguments that are passed on to
         skopt.Optimizer, e.g.
@@ -382,10 +389,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         # A yaml file in the current working directory allows to stop
         # the optimization and proceed with the program
         try:
-            kill_file = 'kill.yaml'
             kill_dict = yaml.load(open(kill_file, 'r'))
             if kill_dict.get('kill', False):
-                logger.critical('Optimizer: Killed by kill file...')
+                logger.critical('Optimizer: Killed by file '+kill_file)
                 kill_dict['kill'] = False
                 yaml.dump(kill_dict, open(kill_file, 'w'),
                           default_flow_style=False)
