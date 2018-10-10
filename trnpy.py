@@ -985,7 +985,9 @@ class DCK_processor(object):
         import datetime
 
         if origin is None:  # Create default datetime object
-            origin = datetime.date.today().replace(month=1, day=1)
+            date = datetime.datetime.today().replace(month=1, day=1)
+            time = datetime.time(hour=0)
+            origin = datetime.datetime.combine(date, time)
         else:
             origin = pd.Timestamp(origin)  # Convert string to datetime object
 
