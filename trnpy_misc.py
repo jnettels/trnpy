@@ -136,7 +136,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
 
     # Create Plot
     p = figure(x_range=group, **kwargs)
-    x_sel = source.column_names[-1]  # An artificial column 'hash_TIME'
+    x_sel = source.column_names[0]  # An artificial column 'hash_TIME'
 
     r_pos = p.vbar_stack(stack_labels, x=x_sel, width=1, source=source,
                          color=palette[0:len(stack_labels)],
@@ -165,6 +165,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     p.legend.background_fill_alpha = 0.5
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
+    p.toolbar.autohide = True
     return p
 
 
@@ -191,6 +192,7 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
         r_list.append(r)
     p.legend.click_policy = 'hide'
     p.xaxis.axis_label = x_col
+    p.toolbar.autohide = True
 
     # Create HoverTool
     tips_list = [(col, "@{"+col+"}") for col in tips_cols]
