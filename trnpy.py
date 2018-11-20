@@ -172,7 +172,13 @@ class TRNExe(object):
 
     def run_TRNSYS_dck(self, dck):
         '''Run a TRNSYS simulation with the given deck dck_file.
+
+        A couple of seconds random delay are added before calling the TRNSYS
+        executable. This may prevent ``I/O Error`` messages from TRNSYS
+        that were sometimes occurring.
         '''
+        import random
+
         if not os.path.exists(self.path_TRNExe):
             raise FileNotFoundError('TRNExe.exe not found: '+self.path_TRNExe)
 
@@ -180,6 +186,8 @@ class TRNExe(object):
             mode_trnsys = '/h'  # hidden mode
         else:
             mode_trnsys = '/n'  # batch mode
+
+        time.sleep(random.uniform(0, 5))  # Start with random delay (seconds)
 
         proc = subprocess.Popen([self.path_TRNExe, dck.file_path_dest,
                                  mode_trnsys])
