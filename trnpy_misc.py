@@ -388,6 +388,31 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             with open(os.path.join(plots_dir, 'opt_result.pkl'), 'wb') as f:
                 pickle.dump(result, f)
 
+        # Generate and save optimization result plots:
+        if result.space.n_dims > 1:
+            try:
+                plt.close('all')
+            except Exception:
+                pass
+
+            plots_dir = os.path.abspath(plots_dir)
+            if plots_dir is not None and not os.path.exists(plots_dir):
+                os.makedirs(plots_dir)
+
+            skopt.plots.plot_evaluations(result, dimensions=result.labels)
+            if plots_dir is not None:
+                plt.savefig(os.path.join(plots_dir, r'skopt_evaluations.png'),
+                            bbox_inches='tight')
+            try:  # plot_objective might fail
+                skopt.plots.plot_objective(result, dimensions=result.labels)
+            except IndexError as ex:
+                logger.error('Error "' + str(ex) + '". Probably not enough ' +
+                             'data to plot partial dependence')
+            else:
+                if plots_dir is not None:
+                    plt.savefig(os.path.join(plots_dir, r'skopt_objective.png'),
+                                bbox_inches='tight')
+
         # A yaml file in the current working directory allows to stop
         # the optimization and proceed with the program
         try:
@@ -404,27 +429,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     logger.info('Optimizer: Best fit after '+str(count)+' rounds: '
                 + str(result.fun))
 
-    # Generate, show and save optimization result plots:
     if result.space.n_dims > 1:
-        plots_dir = os.path.abspath(plots_dir)
-        if plots_dir is not None and not os.path.exists(plots_dir):
-            os.makedirs(plots_dir)
-
-        skopt.plots.plot_evaluations(result, dimensions=result.labels)
-        if plots_dir is not None:
-            plt.savefig(os.path.join(plots_dir, r'skopt_evaluations.png'),
-                        bbox_inches='tight')
-        try:  # plot_objective might fail
-            skopt.plots.plot_objective(result, dimensions=result.labels)
-        except IndexError as ex:
-            logger.error('Error "' + str(ex) + '". Probably not enough ' +
-                         'data to plot partial dependence')
-        else:
-            if plots_dir is not None:
-                plt.savefig(os.path.join(plots_dir, r'skopt_objective.png'),
-                            bbox_inches='tight')
-
         if plots_show is True:
+            # Show optimization result plots
             plt.show()
 
     return result
