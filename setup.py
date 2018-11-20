@@ -14,6 +14,23 @@ Run with the following command prompt to create a Windows executable:
 Lots of modules are excluded from the build and some unnecessary folders are
 removed from the resulting folder. This can cause the program to fail, but
 also dramatically decreases the folder size.
+
+**Troubleshooting**
+
+* ``Module X is missing``
+
+  * Remove the module from the ``excludes`` list
+
+* ``Intel MKL FATAL ERROR: Cannot load mkl_intel_thread.dll``
+
+  * Make sure the following files are in a folder with the trnpy.exe, they can
+    be found at e.g. C:/Users/nettelstroth/Anaconda3/Library/bin
+
+    * libiomp5md.dll
+    * mkl_core.dll
+    * mkl_def.dll
+    * mkl_intel_thread.dll
+
 '''
 
 from setuptools_scm import get_version
@@ -47,6 +64,7 @@ print('Building TRNpy with version tag: ' + version)
 # These settings solved an error, but the paths are different for every user:
 os.environ['TCL_LIBRARY'] = r'C:\Users\nettelstroth\Anaconda3\tcl\tcl8.6'
 os.environ['TK_LIBRARY'] = r'C:\Users\nettelstroth\Anaconda3\tcl\tk8.6'
+mkl_dlls = r'C:\Users\nettelstroth\Anaconda3\Library\bin'
 
 # The setup function
 setup(
@@ -68,7 +86,7 @@ setup(
                                         'colorama',
                                         'concurrent',
                                         'cryptography',
-                                        'ctypes',
+                                        # 'ctypes',
                                         'curses',
                                         'Cython',
                                         'cytoolz',
@@ -124,12 +142,16 @@ setup(
                                         'zmq',
                                         '_pytest',
                                         ],
+                           'include_files': [
+                               os.path.join(mkl_dlls, 'libiomp5md.dll'),
+                               os.path.join(mkl_dlls, 'mkl_core.dll'),
+                               os.path.join(mkl_dlls, 'mkl_def.dll'),
+                               os.path.join(mkl_dlls, 'mkl_intel_thread.dll'),
+                               ]
                            }},
     version=version,
     executables=[Executable('trnpy.py', base=None, icon='res/icon.ico')],
     description='Parallelized TRNSYS simulation with Python',
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
     license='BSD-3-Clause',
     author='Joris Nettelstroth',
     author_email='joris.nettelstroth@stw.de',
