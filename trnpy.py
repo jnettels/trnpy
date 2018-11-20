@@ -1239,6 +1239,18 @@ def file_dialog_parametrics(initialdir=os.getcwd()):
     return path
 
 
+def str2bool(v):
+    '''Convert a string to a boolean value. This is used in argparse to allow
+    the input of boolean values from the command line.
+    '''
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def run_OptionParser(TRNExe, dck_proc):
     '''Define and run the option parser. Set the user input and return the list
     of decks. Needs TRNExe and dck_proc to get and set the option values.
@@ -1332,6 +1344,16 @@ def run_OptionParser(TRNExe, dck_proc):
                         '. "0" is for detection of total number minus one.',
                         default=TRNExe.n_cores)
 
+    group2.add_argument('--check_vital_sign', action='store', type=str2bool,
+                        dest='check_vital_sign',
+                        help="""Determine whether or not a TRNSYS simulation is
+                        "alive" by checking the CPU load. This allows to
+                        automatically detect and quit simulations that
+                        ended with an error. You need to disable this
+                        feature if you want to be able to pause and resume
+                        the live plotter during a simulation.""",
+                        default=TRNExe.check_vital_sign)
+
     # Read the user input:
     args, unknown = parser.parse_known_args()
     args.dck += unknown  # any "unknown" arguments are also treated as decks
@@ -1341,6 +1363,7 @@ def run_OptionParser(TRNExe, dck_proc):
     TRNExe.mode_trnsys_hidden = args.mode_trnsys_hidden
     TRNExe.mode_exec_parallel = args.mode_exec_parallel
     TRNExe.n_cores = args.n_cores
+    TRNExe.check_vital_sign = args.check_vital_sign
     dck_proc.root_folder = os.path.abspath(args.sim_folder)
     dck_proc.regex_result_files = args.regex_result_files
 
