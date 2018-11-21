@@ -656,9 +656,9 @@ class DCK_processor(object):
         Returns:
             None
         '''
-        import collections
+        from collections.abc import Sequence
 
-        if isinstance(dck, collections.Sequence) and not isinstance(dck, str):
+        if isinstance(dck, Sequence) and not isinstance(dck, str):
             for dck_obj in dck:  # Call this function recursively for each dck
                 self.add_replacements(replace_dict_new, dck_obj)
         else:

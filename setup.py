@@ -160,13 +160,13 @@ setup(
 
 # Remove some more specific folders:
 remove_folders = [
-        r'.\build\exe.win-amd64-3.6\mpl-data',
-        r'.\build\exe.win-amd64-3.6\tk\demos',
-        r'.\build\exe.win-amd64-3.6\tcl\tzdata',
-        r'.\build\exe.win-amd64-3.6\lib\pandas\tests',
+        r'.\build\exe.win-amd64-3.7\mpl-data',
+        r'.\build\exe.win-amd64-3.7\tk\demos',
+        r'.\build\exe.win-amd64-3.7\tcl\tzdata',
+        r'.\build\exe.win-amd64-3.7\lib\pandas\tests',
         ]
 for folder in remove_folders:
     shutil.rmtree(folder, ignore_errors=True)
 
 # Copy the README.md file to the build folder, changing extension to .txt
-shutil.copy2(r'.\README.md', r'.\build\exe.win-amd64-3.6\README.txt')
+shutil.copy2(r'.\README.md', r'.\build\exe.win-amd64-3.7\README.txt')

@@ -56,14 +56,14 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False, **kwargs):
     Returns:
         None
     '''
-    import collections
+    from collections.abc import Sequence
 
     if not os.path.exists(os.path.dirname(path)):
         logging.debug('Create directory ' + os.path.dirname(path))
         os.makedirs(os.path.dirname(path))
 
     try:
-        if isinstance(df, collections.Sequence) and not isinstance(df, str):
+        if isinstance(df, Sequence) and not isinstance(df, str):
             # Save a list of DataFrame objects into a single Excel file
             writer = pd.ExcelWriter(path)
             for i, df_ in enumerate(df):
