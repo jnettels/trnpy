@@ -487,9 +487,9 @@ class DCK_processor(object):
     slice to select specific time intervals and / or resample the data to
     new frequencies, e.g. from hours to months.
     '''
-    def __init__(self, root_folder=r'C:\Trnsys17\Work\batch',
+    def __init__(self, sim_folder=r'C:\Trnsys17\Work\batch',
                  regex_result_files=regex_result_files_def):
-        self.root_folder = root_folder
+        self.sim_folder = sim_folder
         self.regex_result_files = regex_result_files
 
     def parametric_table_auto(self, parametric_table, dck_file_list):
@@ -625,7 +625,7 @@ class DCK_processor(object):
             # updated with the correct information.
             dck = DCK(dck_file, regex_result_files=self.regex_result_files)
             dck.hash = hash_
-            dck.file_path_dest = os.path.join(self.root_folder,
+            dck.file_path_dest = os.path.join(self.sim_folder,
                                               dck.file_name,
                                               str(dck.hash),
                                               dck.file_name+'.dck')
@@ -716,7 +716,7 @@ class DCK_processor(object):
                                    copy_files=False):
         '''Takes a list of file paths and creates deck objects for each one.
         If the optional argument ``update_dest`` is True, the destination path
-        becomes a folder with the name of the file, inside the ``root_folder``
+        becomes a folder with the name of the file, inside the ``sim_folder``
         (which is a property of the ``dck_processor`` object).
         The default False means simulating the deck in the original folder.
 
@@ -735,7 +735,7 @@ class DCK_processor(object):
 
             update_dest (bool, optional):
 
-                * True: Simulate within ``root_folder``
+                * True: Simulate within ``sim_folder``
                 * False: Simulate in the original folder (default)
 
             copy_files (bool, optional): If ``update_dest`` is True,
@@ -750,7 +750,7 @@ class DCK_processor(object):
                     for dck_file in dck_file_list]
         if update_dest:
             for dck in dck_list:
-                dck.file_path_dest = os.path.join(self.root_folder,
+                dck.file_path_dest = os.path.join(self.sim_folder,
                                                   dck.file_name,
                                                   dck.file_name+'.dck')
                 dck.hash = dck.file_name  # use name as unique identifier
@@ -1265,6 +1265,58 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+def perform_config(trnexe, dck_proc):
+    '''Many configuration settings can be accessed by the user with the
+    help of a YAML config file. If no config file exists, it is created
+    with the current settings. If it exists, the settings are loaded.
+
+    Args:
+        TRNExe (TRNExe object): An instance of the TRNExe class
+
+        dck_proc (DCK_processor object): An instance of the DCK_processor class
+
+    Returns:
+        None
+    '''
+    import yaml
+    import sys
+
+    if getattr(sys, 'frozen', False):  # Application is frozen (Windows .exe)
+        folder = os.path.dirname(sys.executable)
+    else:  # The application is not frozen (regular Python use)
+        folder = os.path.dirname(__file__)
+
+    config_file = os.path.join(folder, 'trnpy_config.yaml')
+
+    config = {'TRNExe': trnexe.__dict__,
+              'DCK_processor': dck_proc.__dict__,
+              'logger': {'level': logger.level},
+              }
+    config['1 Info'] = \
+        ['This is a YAML configuration file for the program TRNpy',
+         'These settings are used as defaults for the argument parser',
+         'You can use "#" to comment out lines in this file',
+         'To restore the original config, just delete this file and '
+         'restart the program TRNpy',
+         'Run TRNpy with command --help to view the description of the '
+         'arguments']
+
+    if not os.path.exists(config_file):
+        yaml.dump(config, open(config_file, 'w'), default_flow_style=False)
+    else:
+        try:
+            config = yaml.load(open(config_file, 'r'))
+            for key, value in config['TRNExe'].items():
+                trnexe.__dict__[key] = value
+            for key, value in config['DCK_processor'].items():
+                dck_proc.__dict__[key] = value
+            for key, value in config['logger'].items():
+                logger.__dict__[key] = value
+
+        except Exception as ex:
+            logging.error(str(ex))
+
+
 def run_OptionParser(TRNExe, dck_proc):
     '''Define and run the option parser. Set the user input and return the list
     of decks. Needs TRNExe and dck_proc to get and set the option values.
@@ -1330,14 +1382,15 @@ def run_OptionParser(TRNExe, dck_proc):
     group2.add_argument('-l', '--log_level', action='store', dest='log_level',
                         help='LOG_LEVEL can be one of: debug, info, ' +
                         'warning, error or critical',
-                        default='info')
+                        default=logging.getLevelName(
+                                logger.getEffectiveLevel()))
 
     group2.add_argument('--sim_folder', action='store',
                         dest='sim_folder',
                         help='Folder where new simulations are created in, ' +
                         'if --copy_files is true or PARAMETRIC_TABLE is' +
                         ' given',
-                        default=dck_proc.root_folder)
+                        default=dck_proc.sim_folder)
 
     group2.add_argument('--regex_result_files', action='store',
                         dest='regex_result_files',
@@ -1378,7 +1431,7 @@ def run_OptionParser(TRNExe, dck_proc):
     TRNExe.mode_exec_parallel = args.mode_exec_parallel
     TRNExe.n_cores = args.n_cores
     TRNExe.check_vital_sign = args.check_vital_sign
-    dck_proc.root_folder = os.path.abspath(args.sim_folder)
+    dck_proc.sim_folder = os.path.abspath(args.sim_folder)
     dck_proc.regex_result_files = args.regex_result_files
 
     # Set level of logging function
@@ -1415,12 +1468,12 @@ def run_OptionParser(TRNExe, dck_proc):
 
     if parametric_table == 'disabled':
         # Just a list of decks to simulate, without any modifications
+        # Depending on --copy_files, simulate in the --sim_folder or in the
+        # original folder
         dck_list = dck_proc.create_dcks_from_file_list(
                       dck_file_list,
-                      update_dest=args.copy_files)
-
-        if args.copy_files:  # Copy all required files to --sim_folder
-            dck_proc.copy_assigned_files(dck_list)
+                      update_dest=args.copy_files,
+                      copy_files=args.copy_files)
 
     return dck_list  # Return a list of dck objects
 
@@ -1434,13 +1487,15 @@ if __name__ == "__main__":
 
     # Define output format of logging function
     logging.basicConfig(format='%(asctime)-15s %(message)s')
+    logger.setLevel(level='INFO')  # Set a default level for the logger
 
     try:
-        trnexe = TRNExe()
-        dck_proc = DCK_processor()
-        dck_list = run_OptionParser(trnexe, dck_proc)
-        dck_list = trnexe.run_TRNSYS_dck_list(dck_list)
-        dck_proc.report_errors(dck_list)
+        trnexe = TRNExe()  # Create TRNExe object
+        dck_proc = DCK_processor()  # Create DCK_processor object
+        perform_config(trnexe, dck_proc)  # Save or load the config file
+        dck_list = run_OptionParser(trnexe, dck_proc)  # Get user input
+        dck_list = trnexe.run_TRNSYS_dck_list(dck_list)  # Perform simulations
+        dck_proc.report_errors(dck_list)  # Show any simulation errors
     except Exception as ex:
         logger.exception(ex)
 
