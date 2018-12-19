@@ -690,7 +690,7 @@ class DCK_processor(object):
         '''
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
-            re_find = r'(?P<key>\b'+key+'\s?=\s?)(?P<value>.*)'
+            re_find = r'(?P<key>\b'+key+r'\s?=\s?)(?P<value>.*)'
 #            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>\W*\d*\W?\d*\n)'
             # Replace match with key (capture group) plus the new value
             re_replace = r'\g<key>'+str(value)
@@ -702,7 +702,7 @@ class DCK_processor(object):
             Calls add_replacements() with the required regular expressions.
             '''
             re_find = r'\S+(?P<old_text>\s*! 9 Shut off Online )'
-            re_replace = r''+str(-1)+'\g<old_text>'
+            re_replace = r''+str(-1)+r'\g<old_text>'
             self.add_replacements({re_find: re_replace}, dck)
 
     def reset_replacements(self, dck):
@@ -819,8 +819,14 @@ class DCK_processor(object):
                     try:
                         shutil.copy2(source_file, destination_file)
                     except Exception as ex:
-                        logger.debug('Error in ' + dck.file_name)
-                        raise
+                        logger.error(dck.file_name + ': Error when trying to '
+                                     'copy an "assigned" file (input data). '
+                                     'The simulation may fail. Please check '
+                                     'the argument --regex_result_files: '
+                                     '"'+self.regex_result_files+'" '
+                                     'Is this regular expression correct? It '
+                                     'seperates output from input files.')
+                        logger.error(ex)
                 else:
                     logger.debug(dck.file_name + ': Copy source and ' +
                                  'destination are equal for file:')
