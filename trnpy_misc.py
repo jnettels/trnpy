@@ -22,7 +22,8 @@ import pandas as pd
 import yaml
 from bokeh.command.bootstrap import main
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, ColumnDataSource
+from bokeh.models import HoverTool, ColumnDataSource, RangeTool
+from bokeh.layouts import column
 from bokeh.palettes import Spectral11 as palette_default
 
 # Define the logging function
@@ -202,6 +203,129 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
                           renderers=[r])
         p.add_tools(hover)
     return p
+
+
+def bokeh_time_lines(df, fig_link=None, **kwargs):
+    '''Create multiple line plot figures with ``bokeh_time_line()``,
+    one for each hash in the DataFrame.
+
+    Args:
+        df (DataFrame): Simulation results
+
+        fig_link (bokeh figure): A Bokeh figure that you want to link the
+        x-axis to. Usefull if you call ``bokeh_time_lines()`` several times
+        with different ``y_cols``.
+
+    kwargs:
+        y_cols (list): List of column names to plot on the y-axis.
+        Is passed down to ``bokeh_time_line()``.
+
+        Other keyword arguments are passed to ``bokeh_time_line()``,
+        where they are passed to Bokeh's ``figure()``, e.g. ``plot_width``.
+
+    Return:
+        A list of the Bokeh figures.
+    '''
+
+    fig_list = []  # List of Bokeh figure objects (Sankey plots)
+    for hash_ in set(df.index.get_level_values('hash')):
+        df_plot = df.loc[(hash_, slice(None), slice(None)), :]
+
+        title = []
+        for j, level in enumerate(df_plot.index.names):
+            if level == 'TIME':
+                    continue
+            label = df_plot.index.labels[j][0]
+            title += [level+'='+str(df_plot.index.levels[j][label])]
+
+        if len(fig_list) == 0 and fig_link is None:
+            col = bokeh_time_line(df_plot, **kwargs,
+                                  title=', '.join(title))
+        elif fig_link is not None:  # Use external figure for x_range link
+            col = bokeh_time_line(df_plot, **kwargs,
+                                  title=', '.join(title),
+                                  fig_link=fig_link)
+        else:  # Give first figure as input to other figures x_range link
+            col = bokeh_time_line(df_plot, **kwargs,
+                                  title=', '.join(title),
+                                  fig_link=fig_list[0].children[0])
+
+        fig_list += [col]
+
+    for col in fig_list:  # Link all the y_ranges
+        col.children[0].y_range = fig_list[0].children[0].y_range  # figure
+        col.children[1].y_range = fig_list[0].children[0].y_range  # range
+
+    return fig_list
+
+
+def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
+                    fig_link=None, **kwargs):
+    '''Create line plots over a time axis for all or selected columns
+    in a DataFrame. A RangeTool is placed below the figure for easier
+    navigation.
+
+    Args:
+        df_in (DataFrame): Simulation results.
+
+        y_cols (list, optional): List of column names to plot on the y-axis.
+        Per default, use all columns in the DataFrame.
+
+        palette (list, optional): List of colours in hex format.
+
+        fig_link (bokeh figure, optional): A Bokeh figure that you want to
+        link the x-axis to.
+
+    kwargs:
+        Other keyword arguments are passed to Bokeh's ``figure()``,
+        e.g. ``plot_width``.
+
+    Returns:
+        Column of two figures: The time line plot and a select plot below
+
+    '''
+    df = df_in.reset_index()  # Remove index
+    source = ColumnDataSource(data=df)
+
+    if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
+        y_cols = df_in.columns
+    x_col = 'TIME'
+
+    if fig_link is None:
+        fig_x_range = (df[x_col].min(), df[x_col].max())
+    else:
+        fig_x_range = fig_link.x_range
+
+    p = figure(**kwargs, x_axis_type='datetime',
+               x_range=fig_x_range)
+
+    for y_col, color in zip(y_cols, palette):
+        p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+               source=source, color=color, name=y_col)
+
+    hover = HoverTool(tooltips='$name: @$name')
+    p.add_tools(hover)
+    p.legend.location = "top_left"
+    p.legend.click_policy = "hide"
+    p.yaxis.major_label_orientation = "vertical"
+
+    # Add a new figure that uses the range_tool to control the figure p
+    select = figure(plot_height=45, plot_width=p.plot_width, y_range=p.y_range,
+                    x_axis_type="datetime", y_axis_type=None, tools="",
+                    toolbar_location=None, background_fill_color="#efefef")
+
+    range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
+    range_tool.overlay.fill_color = palette[0]
+    range_tool.overlay.fill_alpha = 0.5
+
+    for y_col in y_cols:
+        select.line(x_col, y_col, source=source)
+
+    select.ygrid.grid_line_color = None
+    select.add_tools(range_tool)
+    select.toolbar.active_multi = range_tool
+
+    return column(p, select)
 
 
 def DataExplorer_mark_index(df):
