@@ -975,7 +975,7 @@ class DCK_processor(object):
             but now the last day of the year is missing.
 
             The approach only works for simulations of one or multiple
-            complete years). If this fails, a basic approach including 29.2.
+            complete years. If this fails, a basic approach including 29.2.
             is used instead.
 
         Args:
@@ -1015,6 +1015,12 @@ class DCK_processor(object):
             # Convert TIME column to float
             df[t_col] = [float(string) for string in df[t_col]]
 
+            # Determine frequency as float, string and TimeDelta
+            freq_float = df[t_col][1] - df[t_col][0]
+            freq_str = str(freq_float)
+            time_index = pd.to_datetime(df[t_col], unit='h', origin=origin)
+            freq_timedelta = time_index[1] - time_index[0]
+
             # Convert the TIME float column to the datetime format
             try:
                 # Approach where leap year days are not included in the
@@ -1032,12 +1038,13 @@ class DCK_processor(object):
                                      + ' Cannot remove leap year days.')
 
                 n_years = int(n_hours/8760)  # Number of years per simulation
-                n_sim = int(len(df[t_col])/n_hours)  # Number of simulations
+                # Number of simulations (i.e. for different parameters)
+                n_sim = int(len(df[t_col])*freq_float/n_hours)
 
                 # Create date range, with the correct start and end date
                 end_date = origin.replace(year=origin.year + n_years)
-                dr = pd.date_range(start=origin + pd.Timedelta('1 hours'),
-                                   end=end_date, freq='H')
+                dr = pd.date_range(start=origin + freq_timedelta,
+                                   end=end_date, freq=freq_str+'H')
                 # Remove leap year days from the date range
                 dr = dr[~((dr.month == 2) & (dr.day == 29))]
 
