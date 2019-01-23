@@ -179,14 +179,14 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()`` like
     ``plot_width``, etc.
     '''
-    p = figure(**kwargs)
-    df = df_in.reset_index()  # Remove index
-    source = ColumnDataSource(data=df)
-
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = df_in.columns
 
+    df = df_in.reset_index()  # Remove index
+    source = ColumnDataSource(data=df[[x_col]+y_cols])  # Use required columns
+
     r_list = []
+    p = figure(**kwargs)
     for i, y_col in enumerate(y_cols):
         r = p.circle(x_col, y_col, source=source, legend=y_col+' ',
                      color=palette[i], name=y_col, size=size)
@@ -284,12 +284,12 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
         Column of two figures: The time line plot and a select plot below
 
     '''
-    df = df_in.reset_index()  # Remove index
-    source = ColumnDataSource(data=df)
-
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = df_in.columns
     x_col = 'TIME'
+
+    df = df_in.reset_index()  # Remove index
+    source = ColumnDataSource(data=df[[x_col]+y_cols])  # Use required columns
 
     if fig_link is None:
         fig_x_range = (df[x_col].min(), df[x_col].max())
