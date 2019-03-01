@@ -110,7 +110,7 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
 
 
 def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
-                       palette=palette_default, **kwargs):
+                       palette=palette_default, y_label=None, **kwargs):
     '''Create stacked vertical bar plot in Bokeh from TRNSYS results.
 
     The x-axis will have two groups: hash and TIME.
@@ -167,6 +167,8 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
     p.toolbar.autohide = True
+    if y_label is not None:
+        p.yaxis.axis_label = y_label
     return p
 
 
@@ -183,7 +185,8 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
         y_cols = df_in.columns
 
     df = df_in.reset_index()  # Remove index
-    source = ColumnDataSource(data=df[[x_col]+y_cols])  # Use required columns
+    selection = y_cols + [x_col] + list(tips_cols)
+    source = ColumnDataSource(data=df[selection])  # Use required columns
 
     r_list = []
     p = figure(**kwargs)
@@ -235,7 +238,7 @@ def bokeh_time_lines(df, fig_link=None, **kwargs):
         for j, level in enumerate(df_plot.index.names):
             if level == 'TIME':
                     continue
-            label = df_plot.index.labels[j][0]
+            label = df_plot.index.codes[j][0]
             title += [level+'='+str(df_plot.index.levels[j][label])]
 
         if len(fig_list) == 0 and fig_link is None:
@@ -260,7 +263,7 @@ def bokeh_time_lines(df, fig_link=None, **kwargs):
 
 
 def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
-                    fig_link=None, **kwargs):
+                    fig_link=None, y_label=None, **kwargs):
     '''Create line plots over a time axis for all or selected columns
     in a DataFrame. A RangeTool is placed below the figure for easier
     navigation.
@@ -308,6 +311,8 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
     p.yaxis.major_label_orientation = "vertical"
+    if y_label is not None:
+        p.yaxis.axis_label = y_label
 
     # Add a new figure that uses the range_tool to control the figure p
     select = figure(plot_height=45, plot_width=p.plot_width, y_range=p.y_range,
