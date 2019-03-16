@@ -310,6 +310,10 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     p.add_tools(hover)
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
+    p.legend.label_text_font_size = '8pt'
+    p.legend.spacing = 1
+    p.legend.padding = 5
+
     p.yaxis.major_label_orientation = "vertical"
     if y_label is not None:
         p.yaxis.axis_label = y_label
