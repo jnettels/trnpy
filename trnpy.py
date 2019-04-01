@@ -295,7 +295,8 @@ class TRNExe(object):
         start_time = time.time()
         if not self.mode_exec_parallel:
             returned_dck_list = []
-            for dck in dck_list:
+            for i, dck in enumerate(dck_list):
+                print('{:5.1f}% done.'.format(i/len(dck_list)*100), end='\r')
                 returned_dck = self.run_TRNSYS_dck(dck)
                 returned_dck_list.append(returned_dck)
 
