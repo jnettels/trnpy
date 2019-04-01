@@ -383,20 +383,20 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None):
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-#    ax.plot(x, y, 'ko', ms=3, label='%d Simulationen' % len(x))
-    ax.plot(x, y, 'ko', ms=0, label='Simulationen')
+    ax.plot(x, y, 'ko', ms=3, label='%d Simulationen' % len(x))
+#    ax.plot(x, y, 'ko', ms=0, label='Simulationen')  # invisible dots
 
     n_levels = np.linspace(0, 0.48, num=49)
 #    ax.tricontour(x, y, z, levels=n_levels, linewidths=0.5, colors='k')
-#    cntr = ax.tricontourf(x, y, z, levels=n_levels, cmap="viridis_r")
-#    fig.colorbar(cntr, ax=ax, label='Fehler')  # regular colorbar
+    cntr = ax.tricontourf(x, y, z, levels=n_levels, cmap="viridis_r")
+    fig.colorbar(cntr, ax=ax, label='Fehler')  # regular colorbar
     plt.legend(loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.1))
 
     # Manualy draw colorbar on empty plot
-    cax, _ = mpl.colorbar.make_axes(ax)
-    norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
-    mpl.colorbar.ColorbarBase(cax, cmap="viridis_r", norm=norm, label='Fehler',
-                              ticks=np.linspace(0, 0.5, num=11),)
+#    cax, _ = mpl.colorbar.make_axes(ax)
+#    norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
+#    mpl.colorbar.ColorbarBase(cax, cmap="viridis_r", norm=norm, label='Fehler',
+#                              ticks=np.linspace(0, 0.5, num=11),)
 
 #    ax.set_title('%d Simulationen' % len(x))
 
