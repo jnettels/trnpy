@@ -523,15 +523,23 @@ class DCK_processor(object):
         Args:
             parametric_table (DataFrame): Pandas DataFrame
 
-            dck_file_list (list): List of file paths
+            dck_file_list (list): List of file paths (or single path string)
 
         Returns:
             dck_list (list): List of dck objects
         '''
+        from collections.abc import Sequence
+
         dck_list = []
-        for dck_file in dck_file_list:
-            dck_list += self.get_parametric_dck_list(parametric_table,
-                                                     dck_file)
+        if (isinstance(dck_file_list, Sequence)
+           and not isinstance(dck_file_list, str)):
+                for dck_file in dck_file_list:
+                    dck_list += self.get_parametric_dck_list(parametric_table,
+                                                             dck_file)
+        else:  # Convert single dck_file path string to a list with one entry
+            dck_list = self.get_parametric_dck_list(parametric_table,
+                                                    dck_file_list)
+
         self.rewrite_dcks(dck_list)
         self.copy_assigned_files(dck_list)
         return dck_list
