@@ -402,6 +402,7 @@ class DCK(object):
         self.regex_dict = dict()  # Regular expressions used for replacements
         self.regex_result_files = regex_result_files
         self.dck_text = ''
+        self.dck_equations = dict()  # Dict with all equations in dck_text
 
         # Perform the following functions to initialize some more values
         self.load_dck_text()
@@ -454,6 +455,26 @@ class DCK(object):
                            'assigned files in the deck '+self.file_name+'. '
                            'This may cause issues. Is this regular expression'
                            ' correct? "'+self.regex_result_files+'"')
+
+    def find_equations(self):
+        '''Find equations with key and value (separated by '=') in the text
+        of the deck file. Fill and return a dictionary with the results.
+        This allows easy access to all properties of the simulation.
+
+        Args:
+            None
+
+        Returns:
+            dck_equations (dict): Key, value pairs of equations in dck_text
+        '''
+        re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
+
+        match_list = re.findall(re_find, self.dck_text)
+        if match_list:  # Matches of the regular expression were found
+            for key, value in match_list:
+                self.dck_equations[key] = value
+
+        return self.dck_equations
 
 
 class DCK_processor(object):
