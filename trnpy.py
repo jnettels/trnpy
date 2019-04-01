@@ -1104,8 +1104,10 @@ class DCK_processor(object):
             df.sort_index(inplace=True)
 
             # Check if there are leap years in the data:
-            bool_leap = df.index.get_level_values(t_col).is_leap_year
-            if bool_leap.any():
+            df_test = df.copy()
+            df_test = df_test.unstack(df_test.index.names[:-1])
+            bool_leap = df_test.index.get_level_values(t_col).is_leap_year
+            if bool_leap[:-1].any():  # Ignore the very last time stamp
                 df_leap = pd.DataFrame(data=bool_leap, index=df.index,
                                        columns=['is_leap_year'])
                 df_leap['year'] = df_leap.index.get_level_values(t_col).year
