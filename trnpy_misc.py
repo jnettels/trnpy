@@ -30,14 +30,18 @@ from bokeh.palettes import Spectral11 as palette_default
 logger = logging.getLogger(__name__)
 
 
-def df_to_excel(df, path, sheet_names=[], merge_cells=False, **kwargs):
+def df_to_excel(df, path, sheet_names=[], merge_cells=False,
+                check_permission=True, **kwargs):
     '''Wrapper around pandas' function ``DataFrame.to_excel()``, which creates
-    the required directory and only logs any errors instead of terminating
-    the script (happens often when the Excel file is currently opended).
+    the required directory.
+    In case of a ``PermissionError`` (happens when the Excel file is currently
+    opended), the file is instead saved with a time stamp.
+
     Additional keyword arguments are passed down to ``to_excel()``.
     Can save a single DataFrame to a single Excel file or multiple DataFrames
     to a combined Excel file.
 
+    The function calls itself recursively to achieve those features.
 
     Args:
         df (DataFrame or list): Pandas DataFrame object(s) to save
@@ -50,6 +54,9 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False, **kwargs):
         merge_cells (boolean, optional): Write MultiIndex and Hierarchical
         Rows as merged cells. Default False.
 
+        check_permission (boolean): If the file already exists, instead try
+        to save with an appended time stamp.
+
         freeze_panes (tuple or boolean, optional): Per default, the sheet
         cells are frozen to always keep the index visible (by determining the
         correct coordinate ``tuple``). Use ``False`` to disable this.
@@ -58,40 +65,62 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False, **kwargs):
         None
     '''
     from collections.abc import Sequence
+    import time
 
+    if check_permission:
+        try:
+            # Try to complete the function without this permission check
+            df_to_excel(df, path, sheet_names=sheet_names,
+                        merge_cells=merge_cells, check_permission=False,
+                        **kwargs)
+            return  # Do not run the rest of the function
+        except PermissionError as e:
+            # If a PermissionError occurs, run the whole function again, but
+            # with another file path (with appended time stamp)
+            logger.critical(e)
+            ts = time.localtime()
+            ts = time.strftime('%Y-%m-%d_%H-%M-%S', ts)
+            path_time = (os.path.splitext(path)[0] + '_' +
+                         ts + os.path.splitext(path)[1])
+            logger.critical('Writing instead to:  '+path_time)
+            df_to_excel(df, path_time, sheet_names=sheet_names,
+                        merge_cells=merge_cells, **kwargs)
+            return  # Do not run the rest of the function
+
+    # Here the 'actual' function content starts:
     if not os.path.exists(os.path.dirname(path)):
         logging.debug('Create directory ' + os.path.dirname(path))
         os.makedirs(os.path.dirname(path))
 
-    try:
-        if isinstance(df, Sequence) and not isinstance(df, str):
-            # Save a list of DataFrame objects into a single Excel file
-            writer = pd.ExcelWriter(path)
-            for i, df_ in enumerate(df):
-                try:  # Use given sheet name, or just an enumeration
-                    sheet = sheet_names[i]
-                except IndexError:
-                    sheet = str(i)
-                # Add current sheet to the ExcelWriter by calling this
-                # function recursively
-                df_to_excel(df=df_, path=writer, sheet_name=sheet,
-                            merge_cells=merge_cells, **kwargs)
-            writer.save()  # Save the actual Excel file
+    if isinstance(df, Sequence) and not isinstance(df, str):
+        # Save a list of DataFrame objects into a single Excel file
+        writer = pd.ExcelWriter(path)
+        for i, df_ in enumerate(df):
+            try:  # Use given sheet name, or just an enumeration
+                sheet = sheet_names[i]
+            except IndexError:
+                sheet = str(i)
+            # Add current sheet to the ExcelWriter by calling this
+            # function recursively
+            df_to_excel(df=df_, path=writer, sheet_name=sheet,
+                        merge_cells=merge_cells, **kwargs)
+        writer.save()  # Save the actual Excel file
 
-        else:
-            # Per default, the sheet cells are frozen to keep the index visible
-            if 'freeze_panes' not in kwargs or kwargs['freeze_panes'] is True:
-                # Find the right cell to freeze in the Excel sheet
-                kwargs['freeze_panes'] = (1, len(df.index.names))
-            elif kwargs['freeze_panes'] is False:
-                del(kwargs['freeze_panes'])
+    else:
+        # Per default, the sheet cells are frozen to keep the index visible
+        if 'freeze_panes' not in kwargs or kwargs['freeze_panes'] is True:
+            # Find the right cell to freeze in the Excel sheet
+            if merge_cells:
+                freeze_rows = len(df.columns.names) + 1
+            else:
+                freeze_rows = 1
 
-            # Save one DataFrame to one Excel file
-            df.to_excel(path, merge_cells=merge_cells, **kwargs)
+            kwargs['freeze_panes'] = (freeze_rows, len(df.index.names))
+        elif kwargs['freeze_panes'] is False:
+            del(kwargs['freeze_panes'])
 
-    except Exception as ex:
-        logging.exception(ex)
-        pass
+        # Save one DataFrame to one Excel file
+        df.to_excel(path, merge_cells=merge_cells, **kwargs)
 
 
 def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
@@ -101,10 +130,10 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
     This is useful for filtering out time steps where a component is not
     active from mean values calculated later.
     '''
-    for column in df.columns:
+    for column_ in df.columns:
         for filter_ in filters:
-            if filter_ in column:
-                df[column][mask] = float('NaN')
+            if filter_ in column_:
+                df[column_][mask] = float('NaN')
                 break  # Break inner for-loop if one filter was matched
     return df
 
@@ -263,7 +292,7 @@ def bokeh_time_lines(df, fig_link=None, **kwargs):
 
 
 def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
-                    fig_link=None, y_label=None, **kwargs):
+                    fig_link=None, y_label=None, x_col='TIME', **kwargs):
     '''Create line plots over a time axis for all or selected columns
     in a DataFrame. A RangeTool is placed below the figure for easier
     navigation.
@@ -288,8 +317,8 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
 
     '''
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
-        y_cols = df_in.columns
-    x_col = 'TIME'
+        y_cols = list(df_in.columns)
+    x_col = x_col
 
     df = df_in.reset_index()  # Remove index
     source = ColumnDataSource(data=df[[x_col]+y_cols])  # Use required columns
@@ -438,6 +467,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
 
         n_cores (int, optional): Number of CPU cores to use in parallel,
         defaults to total number of cores minus 1.
+
+        tol (float, optional): Error tolerance. Optimization finishes with
+        ``success`` if a result lower than ``tol`` is achieved.
 
         random_state (int or None, optional):
         Set random state to something other than None for reproducible
