@@ -9,7 +9,7 @@ Run with the following command prompt to create a Windows executable:
 
 .. code::
 
-    python setup.py build
+    python setup_exe.py build
 
 Lots of modules are excluded from the build and some unnecessary folders are
 removed from the resulting folder. This can cause the program to fail, but
@@ -37,6 +37,7 @@ from setuptools_scm import get_version
 from cx_Freeze import setup, Executable
 import os
 import shutil
+import sys
 
 
 try:
@@ -61,14 +62,25 @@ if 'g' in version:  # 'Dirty' version, does not fit to Windows' version scheme
 
 print('Building TRNpy with version tag: ' + version)
 
-# These settings solved an error, but the paths are different for every user:
-os.environ['TCL_LIBRARY'] = r'C:\Users\nettelstroth\Anaconda3\tcl\tcl8.6'
-os.environ['TK_LIBRARY'] = r'C:\Users\nettelstroth\Anaconda3\tcl\tk8.6'
-mkl_dlls = r'C:\Users\nettelstroth\Anaconda3\Library\bin'
+# These settings solved an error (set to folders in python directory)
+os.environ['TCL_LIBRARY'] = os.path.join(sys.exec_prefix, r'tcl\tcl8.6')
+os.environ['TK_LIBRARY'] = os.path.join(sys.exec_prefix, r'tcl\tk8.6')
+mkl_dlls = os.path.join(sys.exec_prefix, r'Library\bin')
 
 # The setup function
 setup(
-    name='TRNpy',
+    name='trnpy',
+    version=version,
+    description='Parallelized TRNSYS simulation with Python',
+    long_description=open('README.md').read(),
+    license='GPL-3.0',
+    author='Joris Nettelstroth',
+    author_email='joris.nettelstroth@stw.de',
+    url='https://bitbucket.org/joris_nettelstroth/trnpy',
+
+    # Options for building the Windows .exe
+    executables=[Executable(r'trnpy-script.py', base=None,
+                            icon=r'res/icon.ico')],
     options={'build_exe': {'packages': ['numpy', 'asyncio'],
                            'includes': [],
                            'excludes': ['adodbapi',
@@ -149,13 +161,6 @@ setup(
                                os.path.join(mkl_dlls, 'mkl_intel_thread.dll'),
                                ]
                            }},
-    version=version,
-    executables=[Executable('trnpy.py', base=None, icon='res/icon.ico')],
-    description='Parallelized TRNSYS simulation with Python',
-    license='BSD-3-Clause',
-    author='Joris Nettelstroth',
-    author_email='joris.nettelstroth@stw.de',
-    url='https://bitbucket.org/joris_nettelstroth/trnpy',
 )
 
 # Remove some more specific folders:
