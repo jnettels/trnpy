@@ -237,7 +237,7 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     return p
 
 
-def bokeh_time_lines(df, fig_link=None, **kwargs):
+def bokeh_time_lines(df, fig_link=None, index_level='hash', **kwargs):
     '''Create multiple line plot figures with ``bokeh_time_line()``,
     one for each hash in the DataFrame.
 
@@ -247,6 +247,9 @@ def bokeh_time_lines(df, fig_link=None, **kwargs):
         fig_link (bokeh figure): A Bokeh figure that you want to link the
         x-axis to. Usefull if you call ``bokeh_time_lines()`` several times
         with different ``y_cols``.
+
+        index_level (str): Name of the index level for whose values individual
+        plots will be created. Default = 'hash'.
 
     kwargs:
         y_cols (list): List of column names to plot on the y-axis.
@@ -260,7 +263,7 @@ def bokeh_time_lines(df, fig_link=None, **kwargs):
     '''
 
     fig_list = []  # List of Bokeh figure objects (Sankey plots)
-    for hash_ in set(df.index.get_level_values('hash')):
+    for hash_ in set(df.index.get_level_values(index_level)):
         df_plot = df.loc[(hash_, slice(None), slice(None)), :]
 
         title = []
