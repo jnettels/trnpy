@@ -79,7 +79,7 @@ setup(
     url='https://bitbucket.org/joris_nettelstroth/trnpy',
 
     # Options for building the Windows .exe
-    executables=[Executable(r'trnpy-script.py', base=None,
+    executables=[Executable(r'trnpy/trnpy_script.py', base=None,
                             icon=r'res/icon.ico')],
     options={'build_exe': {'packages': ['numpy', 'asyncio'],
                            'includes': [],

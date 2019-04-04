@@ -116,6 +116,28 @@ from trnpy.core import TRNExe, DCK_processor
 logger = logging.getLogger(__name__)
 
 
+def main():
+    '''Main function. Perform all tasks for the interactive use of TRNpy.
+    '''
+    multiprocessing.freeze_support()  # Required on Windows
+
+    # Define output format of logging function
+    logging.basicConfig(format='%(asctime)-15s %(message)s')
+    logger.setLevel(level='INFO')  # Set a default level for the logger
+
+    try:
+        trnexe = TRNExe()  # Create TRNExe object
+        dck_proc = DCK_processor()  # Create DCK_processor object
+        cfg = perform_config(trnexe, dck_proc)  # Save or load the config file
+        dck_list = run_OptionParser(trnexe, dck_proc, cfg)  # Get user input
+        dck_list = trnexe.run_TRNSYS_dck_list(dck_list)  # Perform simulations
+        dck_proc.report_errors(dck_list)  # Show any simulation errors
+    except Exception as ex:
+        logger.exception(ex)
+
+    input('\nPress the enter key to exit.')
+
+
 def file_dialog_dck(initialdir=os.getcwd()):
     '''This function presents a file dialog for one or more TRNSYS deck files.
 
@@ -230,8 +252,10 @@ def perform_config(trnexe, dck_proc):
         except Exception as ex:
             logging.error(str(ex))
 
+    return config_file
 
-def run_OptionParser(TRNExe, dck_proc):
+
+def run_OptionParser(TRNExe, dck_proc, cfg):
     '''Define and run the option parser. Set the user input and return the list
     of decks. Needs TRNExe and dck_proc to get and set the option values.
 
@@ -248,7 +272,10 @@ def run_OptionParser(TRNExe, dck_proc):
         'Simulate all the TRNSYS deck files specified as DCK '\
         'arguments in serial or parallel. Specify a '\
         'PARAMETRIC_TABLE file to perform simulations for different'\
-        ' sets of parameters. See documentation for further help.'
+        ' sets of parameters. See documentation for further help. '\
+        'You can define the default values of some parameters by editing '\
+        'the YAML configuration file found here: ' + cfg
+
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.
                                      ArgumentDefaultsHelpFormatter)
@@ -395,24 +422,7 @@ def run_OptionParser(TRNExe, dck_proc):
 
 
 if __name__ == "__main__":
-    '''Main function
-    This function is executed when the script is started directly with
+    '''This part is executed when the script is started directly with
     Python, not when it is loaded as a module.
     '''
-    multiprocessing.freeze_support()  # Required on Windows
-
-    # Define output format of logging function
-    logging.basicConfig(format='%(asctime)-15s %(message)s')
-    logger.setLevel(level='INFO')  # Set a default level for the logger
-
-    try:
-        trnexe = TRNExe()  # Create TRNExe object
-        dck_proc = DCK_processor()  # Create DCK_processor object
-        perform_config(trnexe, dck_proc)  # Save or load the config file
-        dck_list = run_OptionParser(trnexe, dck_proc)  # Get user input
-        dck_list = trnexe.run_TRNSYS_dck_list(dck_list)  # Perform simulations
-        dck_proc.report_errors(dck_list)  # Show any simulation errors
-    except Exception as ex:
-        logger.exception(ex)
-
-    input('\nPress the enter key to exit.')
+    main()

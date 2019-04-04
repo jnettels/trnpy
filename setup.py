@@ -38,6 +38,8 @@ setup(
     url='https://bitbucket.org/joris_nettelstroth/trnpy',
     install_requires=['pandas>=0.24.1', ],
     python_requires='>=3.7',
-    scripts=['trnpy-script.py', ],
     packages=['trnpy', ],
+    entry_points={
+        'console_scripts': ['trnpy = trnpy.trnpy_script:main'],
+        }
 )
