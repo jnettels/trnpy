@@ -1,6 +1,22 @@
 # -*- coding: utf-8 -*-
 '''
-@author: Joris Nettelstroth
+**TRNpy: Parallelized TRNSYS simulation with Python**
+
+Copyright (C) 2019 Joris Nettelstroth
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see https://www.gnu.org/licenses/.
+
 
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
@@ -9,7 +25,9 @@ perform simulations for different sets of parameters. TRNpy helps to automate
 these and similar operations by providing functions to manipulate deck files
 and run TRNSYS simulations from a programmatic level.
 
-TRNpy_misc is a collection of miscellaneous functions that are often useful
+Module Misc
+-----------
+This is a collection of miscellaneous functions that are often useful
 when working with TRNpy. These are often wrappers around functions provided
 by other modules such as Pandas, Bokeh, Scikit-Optimize and DataExplorer.
 '''
