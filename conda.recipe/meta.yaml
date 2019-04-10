@@ -1,0 +1,36 @@
+package:
+  name: trnpy
+  version: '0.7.0'
+
+source:
+    path: ..
+
+build:
+  number: 5
+
+  # noarch: python
+
+  entry_points:
+    # Put any entry points (scripts to be generated automatically) here.
+    - trnpy = trnpy.trnpy_script:main
+
+
+requirements:
+    build:
+        - python
+        - setuptools
+        - setuptools_scm
+        - pandas >=0.24.1
+
+    run:
+        - python
+        - pandas >=0.24.1
+
+about:
+    home: https://github.com/jnettels/trnpy
+    summary: 'Parallelized TRNSYS simulation with Python'
+    description: 'Parallelized TRNSYS simulation with Python'
+    license: 'GPL-3.0'
+    license_file: LICENSE.txt
+    author: 'Joris Nettelstroth'
+    author_email: 'joris.nettelstroth@stw.de'
