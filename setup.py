@@ -38,7 +38,8 @@ setup(
     url='https://github.com/jnettels/trnpy',
     install_requires=['pandas>=0.24.1', ],
     python_requires='>=3.7',
-    packages=['trnpy', ],
+    packages=['trnpy', 'trnpy/examples'],
+    package_data={'trnpy/examples': ['Parametrics.xlsx'], },
     entry_points={
         'console_scripts': ['trnpy = trnpy.trnpy_script:main'],
         }
