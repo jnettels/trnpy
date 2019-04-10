@@ -35,7 +35,7 @@ setup(
     license='GPL-3.0',
     author='Joris Nettelstroth',
     author_email='joris.nettelstroth@stw.de',
-    url='https://bitbucket.org/joris_nettelstroth/trnpy',
+    url='https://github.com/jnettels/trnpy',
     install_requires=['pandas>=0.24.1', ],
     python_requires='>=3.7',
     packages=['trnpy', ],

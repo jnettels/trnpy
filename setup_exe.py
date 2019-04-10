@@ -76,7 +76,7 @@ setup(
     license='GPL-3.0',
     author='Joris Nettelstroth',
     author_email='joris.nettelstroth@stw.de',
-    url='https://bitbucket.org/joris_nettelstroth/trnpy',
+    url='https://github.com/jnettels/trnpy',
 
     # Options for building the Windows .exe
     executables=[Executable(r'trnpy/trnpy_script.py', base=None,
