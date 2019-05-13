@@ -255,7 +255,8 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     return p
 
 
-def bokeh_time_lines(df, fig_link=None, index_level='hash', **kwargs):
+def bokeh_time_lines(df, fig_link=None, index_level='hash', x_col='TIME',
+                     **kwargs):
     '''Create multiple line plot figures with ``bokeh_time_line()``,
     one for each hash in the DataFrame.
 
@@ -281,25 +282,25 @@ def bokeh_time_lines(df, fig_link=None, index_level='hash', **kwargs):
     '''
 
     fig_list = []  # List of Bokeh figure objects (Sankey plots)
-    for hash_ in set(df.index.get_level_values(index_level)):
+    for hash_ in sorted(set(df.index.get_level_values(index_level))):
         df_plot = df.loc[(hash_, slice(None), slice(None)), :]
 
         title = []
         for j, level in enumerate(df_plot.index.names):
-            if level == 'TIME':
-                    continue
+            if level == x_col:
+                continue
             label = df_plot.index.codes[j][0]
             title += [level+'='+str(df_plot.index.levels[j][label])]
 
         if len(fig_list) == 0 and fig_link is None:
-            col = bokeh_time_line(df_plot, **kwargs,
+            col = bokeh_time_line(df_plot, x_col=x_col, **kwargs,
                                   title=', '.join(title))
         elif fig_link is not None:  # Use external figure for x_range link
-            col = bokeh_time_line(df_plot, **kwargs,
+            col = bokeh_time_line(df_plot, x_col=x_col, **kwargs,
                                   title=', '.join(title),
                                   fig_link=fig_link)
         else:  # Give first figure as input to other figures x_range link
-            col = bokeh_time_line(df_plot, **kwargs,
+            col = bokeh_time_line(df_plot, x_col=x_col, **kwargs,
                                   title=', '.join(title),
                                   fig_link=fig_list[0].children[0])
 
