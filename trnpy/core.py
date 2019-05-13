@@ -461,9 +461,9 @@ class DCK_processor(object):
         dck_list = []
         if (isinstance(dck_file_list, Sequence)
            and not isinstance(dck_file_list, str)):
-                for dck_file in dck_file_list:
-                    dck_list += self.get_parametric_dck_list(parametric_table,
-                                                             dck_file)
+            for dck_file in dck_file_list:
+                dck_list += self.get_parametric_dck_list(parametric_table,
+                                                         dck_file)
         else:  # Convert single dck_file path string to a list with one entry
             dck_list = self.get_parametric_dck_list(parametric_table,
                                                     dck_file_list)
@@ -656,12 +656,12 @@ class DCK_processor(object):
             self.add_replacements({re_find: re_replace}, dck)
 
     def disable_plotters(self, dck):
-            '''Disable the plotters by setting their parameter 9 to '-1'.
-            Calls add_replacements() with the required regular expressions.
-            '''
-            re_find = r'\S+(?P<old_text>\s*! 9 Shut off Online )'
-            re_replace = r''+str(-1)+r'\g<old_text>'
-            self.add_replacements({re_find: re_replace}, dck)
+        '''Disable the plotters by setting their parameter 9 to '-1'.
+        Calls add_replacements() with the required regular expressions.
+        '''
+        re_find = r'\S+(?P<old_text>\s*! 9 Shut off Online )'
+        re_replace = r''+str(-1)+r'\g<old_text>'
+        self.add_replacements({re_find: re_replace}, dck)
 
     def reset_replacements(self, dck):
         '''Reset all previous replacements by making ``replace_dict`` and
@@ -802,7 +802,7 @@ class DCK_processor(object):
                 os.makedirs(os.path.dirname(dck.file_path_dest))
 
             with open(os.path.join(dck.file_path_dest), "w") as f:
-                    f.write(dck.dck_text)
+                f.write(dck.dck_text)
 
         # Print the list of the created & copied parametric deck files
         logger.debug('List of copied dck files:')
@@ -812,23 +812,31 @@ class DCK_processor(object):
 
         return
 
-    def report_errors(self, dck_list):
+    def report_errors(self, dck_list, warn=False):
         '''Print all the errors stored in the ``dck`` objects of the given
         dck_list.
 
         Args:
             dck_list (list): List of ``dck`` objects
 
+            warn (bool): Optionally, raise a warning if any error was found
+
         Returns:
-            None
+            error_found (bool): True, if an error was found
         '''
+        error_found = False
         for dck in dck_list:
             if dck.success is False:
-                print('Errors in ' + dck.file_path_dest)
+                error_found = True
+                logger.error('Errors in ' + dck.file_path_dest)
                 for i, error_msg in enumerate(dck.error_msg_list):
                     print('  '+str(i)+': '+error_msg)
                 print('')  # Finish with an empty line
-        return
+
+        if warn and error_found:
+            raise RuntimeWarning('Errors found in ' + dck.file_path_dest)
+
+        return error_found
 
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None):
