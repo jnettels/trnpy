@@ -388,6 +388,8 @@ class DCK(object):
         '''Find equations with key and value (separated by '=') in the text
         of the deck file. Fill and return a dictionary with the results.
         This allows easy access to all properties of the simulation.
+        The function tries to solve simple equations and turn the values
+        into floats.
 
         Args:
             None
@@ -400,7 +402,33 @@ class DCK(object):
         match_list = re.findall(re_find, self.dck_text)
         if match_list:  # Matches of the regular expression were found
             for key, value in match_list:
-                self.dck_equations[key] = value
+                try:  # Try to convert the string to a float
+                    self.dck_equations[key] = float(value)
+                except Exception:
+                    try:  # Try to solve an equation and turn it into float
+                        self.dck_equations[key] = float(eval(value))
+                    except Exception:  # Just store the string
+                        self.dck_equations[key] = value
+
+        # Work through all equations a second time. This gives a chance
+        # to fill out variables and solve equations that failed before:
+        for key, value in self.dck_equations.items():
+            try:
+                self.dck_equations[key] = float(eval(value))
+            except NameError as e:  # Equation contains a variable name
+                name = re.findall(r"'(.+)'", str(e))[0]
+                try:  # Try to find the value of the variable name
+                    name_value = self.dck_equations[name]
+                except KeyError:
+                    pass
+                else:  # Substitute the variable name with its value
+                    eval_str = re.sub(name, str(name_value), value)
+                    try:  # Now try to convert it to a float again
+                        self.dck_equations[key] = float(eval(eval_str))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         return self.dck_equations
 
