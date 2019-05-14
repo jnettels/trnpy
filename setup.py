@@ -24,8 +24,6 @@ except LookupError:
     print('Warning: setuptools-scm requires an intact git repository to detect'
           ' the version number for this build.')
 
-print('Building TRNpy with version tag: ' + version)
-
 # The setup function
 setup(
     name='trnpy',
