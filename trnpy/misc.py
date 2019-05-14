@@ -602,7 +602,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         # A yaml file in the current working directory allows to stop
         # the optimization and proceed with the program
         try:
-            kill_dict = yaml.load(open(kill_file, 'r'))
+            kill_dict = yaml.load(open(kill_file, 'r'), Loader=yaml.FullLoader)
             if kill_dict.get('kill', False):
                 logger.critical('Optimizer: Killed by file '+kill_file)
                 kill_dict['kill'] = False

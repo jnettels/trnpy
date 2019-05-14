@@ -171,7 +171,7 @@ def perform_config(trnexe, dck_proc):
         yaml.dump(config, open(config_file, 'w'), default_flow_style=False)
     else:
         try:
-            config = yaml.load(open(config_file, 'r'))
+            config = yaml.load(open(config_file, 'r'), Loader=yaml.FullLoader)
             for key, value in config['TRNExe'].items():
                 trnexe.__dict__[key] = value
             for key, value in config['DCK_processor'].items():
