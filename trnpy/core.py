@@ -1061,6 +1061,12 @@ class DCK_processor(object):
                 # However, this creates a 29.2. in all leap years
                 df[t_col] = pd.to_datetime(df[t_col], unit='h', origin=origin)
 
+            # With a simulation time step of one minute, rounding errors
+            # can produce an imperfect index. Rounding to seconds may fix it:
+            df.set_index(keys=[t_col], inplace=True)  # convert to index
+            df.index = df.index.round('S')  # Round to seconds
+            df.reset_index(inplace=True)  # convert back to column
+
             # Create a list and use that as the new index columns
             try:  # Try to create an index including 'hash'
                 idx_cols = ['hash'] + list(replace_dict.keys()) + [t_col]
@@ -1071,9 +1077,18 @@ class DCK_processor(object):
 
             df.sort_index(inplace=True)
 
-            # Check if there are leap years in the data:
+            # Check if the index has a frequency:
             df_test = df.copy()
             df_test = df_test.unstack(df_test.index.names[:-1])
+            if pd.infer_freq(df_test.index) is None:
+                logger.warning('Frequency of time index could not be inferred '
+                               '(i.e. the time index is not spaced evenly)! '
+                               'This can occur in simulations with one minute '
+                               'time steps, where rounding errors add up. '
+                               'Use "STEP = 0.016666666" (many decimal places'
+                               ') for time steps of one minute in TRNSYS.')
+
+            # Check if there are leap years in the data:
             bool_leap = df_test.index.get_level_values(t_col).is_leap_year
             if bool_leap[:-1].any():  # Ignore the very last time stamp
                 df_leap = pd.DataFrame(data=bool_leap, index=df.index,
