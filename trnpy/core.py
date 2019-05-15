@@ -910,7 +910,7 @@ class DCK_processor(object):
             result_data (dict): A dictionary with one DataFrame for each file
         '''
         result_data = dict()
-        for dck in dck_list:
+        for i, dck in enumerate(dck_list, start=1):
             for result_file in dck.result_files:
                 # Construct the full path to the result file
                 result_file_path = os.path.join(os.path.dirname(
@@ -940,6 +940,10 @@ class DCK_processor(object):
                 except Exception as ex:
                     logger.error('Error when trying to read result file "' +
                                  result_file + '": ' + str(ex))
+
+            if logger.isEnabledFor(logging.INFO):  # Print progress
+                frac = i/len(dck_list)*100
+                print('Collecting results: {:5.1f}%'.format(frac), end='\r')
 
         logger.info('Collected result files:')
         if logger.isEnabledFor(logging.INFO):
