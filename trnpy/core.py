@@ -1183,16 +1183,22 @@ class DCK_processor(object):
                 elif re.search(regex_mean, column):
                     cols_mean.append(column)
                     cols_found.append(column)
-            if prio == 'mean':
+                else:
+                    logger.debug('Column "'+column+'" does not match the '
+                                 'regular expressions and is not resampled.')
+            elif prio == 'mean':
                 if re.search(regex_mean, column):
                     cols_mean.append(column)
                     cols_found.append(column)
                 elif re.search(regex_sum, column):
                     cols_sum.append(column)
                     cols_found.append(column)
+                else:
+                    logger.debug('Column "'+column+'" does not match the '
+                                 'regular expressions and is not resampled.')
             else:
-                logger.debug('Column "'+column+'" did not match the regular '
-                             'expressions and will not be resampled')
+                raise ValueError('Resampling priority setting must be "sum" '
+                                 'or "mean". "'+prio+'" is unknown.')
 
         if len(df.index.names) == 1:
             # If there is only the time column in the index, the resampling
