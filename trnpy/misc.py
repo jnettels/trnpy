@@ -191,9 +191,12 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
                          name=stack_labels,
                          legend=[x+" " for x in stack_labels],
                          )
+    if len(stack_labels_neg) > 0:
+        palette_neg = palette[-len(stack_labels_neg):]
+    else:
+        palette_neg = []
     r_neg = p.vbar_stack(stack_labels_neg, x=x_sel, width=1, source=source,
-                         color=palette[-len(stack_labels_neg)],
-                         name=stack_labels_neg,
+                         color=palette_neg, name=stack_labels_neg,
                          legend=[x+" " for x in stack_labels_neg],
                          )
 
