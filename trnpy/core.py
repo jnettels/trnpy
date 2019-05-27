@@ -384,7 +384,7 @@ class DCK(object):
                            'This may cause issues. Is this regular expression'
                            ' correct? "'+self.regex_result_files+'"')
 
-    def find_equations(self):
+    def find_equations(self, iteration=5):
         '''Find equations with key and value (separated by '=') in the text
         of the deck file. Fill and return a dictionary with the results.
         This allows easy access to all properties of the simulation.
@@ -397,20 +397,21 @@ class DCK(object):
         Returns:
             dck_equations (dict): Key, value pairs of equations in dck_text
         '''
-        re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
+        if iteration >= 5:  # Only find equations in the first iteration
+            re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
 
-        match_list = re.findall(re_find, self.dck_text)
-        if match_list:  # Matches of the regular expression were found
-            for key, value in match_list:
-                try:  # Try to convert the string to a float
-                    self.dck_equations[key] = float(value)
-                except Exception:
-                    try:  # Try to solve an equation and turn it into float
-                        self.dck_equations[key] = float(eval(value))
-                    except Exception:  # Just store the string
-                        self.dck_equations[key] = value
+            match_list = re.findall(re_find, self.dck_text)
+            if match_list:  # Matches of the regular expression were found
+                for key, value in match_list:
+                    try:  # Try to convert the string to a float
+                        self.dck_equations[key] = float(value)
+                    except Exception:
+                        try:  # Try to solve an equation and turn it into float
+                            self.dck_equations[key] = float(eval(value))
+                        except Exception:  # Just store the string
+                            self.dck_equations[key] = value
 
-        # Work through all equations a second time. This gives a chance
+        # Work through all equations again. This gives a chance
         # to fill out variables and solve equations that failed before:
         for key, value in self.dck_equations.items():
             try:
@@ -423,12 +424,18 @@ class DCK(object):
                     pass
                 else:  # Substitute the variable name with its value
                     eval_str = re.sub(name, str(name_value), value)
+                    self.dck_equations[key] = eval_str  # Store result
                     try:  # Now try to convert it to a float again
                         self.dck_equations[key] = float(eval(eval_str))
                     except Exception:
                         pass
             except Exception:
                 pass
+
+        if iteration > 0:
+            # Recursively solve more and more equations with each iteration
+            iteration -= 1
+            self.find_equations(iteration=iteration)
 
         return self.dck_equations
 
@@ -945,8 +952,8 @@ class DCK_processor(object):
                 frac = i/len(dck_list)*100
                 print('Collecting results: {:5.1f}%'.format(frac), end='\r')
 
-        logger.info('Collected result files:')
-        if logger.isEnabledFor(logging.INFO):
+        logger.debug('Collected result files:')
+        if logger.isEnabledFor(logging.DEBUG):
             for file in result_data.keys():
                 print(file)
 
