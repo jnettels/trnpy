@@ -45,7 +45,7 @@ import psutil
 import itertools
 
 # Default values that are used by multiple classes:
-regex_result_files_def = r'Result|\.sum|\.pr.'
+regex_result_files_def = r'Result|\.sum|\.pr.|\.plt'  # treat as result files
 
 # Define the logging function
 logger = logging.getLogger(__name__)
@@ -374,6 +374,7 @@ class DCK(object):
         self.result_files = []
         self.assigned_files = re.findall(r'ASSIGN \"(.*)\"', self.dck_text)
         for file in self.assigned_files.copy():
+            # Test if the assigned file is supposed to be a result / output
             if re.search(self.regex_result_files, file):
                 self.assigned_files.remove(file)
                 self.result_files.append(file)
@@ -383,6 +384,15 @@ class DCK(object):
                            'assigned files in the deck '+self.file_name+'. '
                            'This may cause issues. Is this regular expression'
                            ' correct? "'+self.regex_result_files+'"')
+
+        # TRNSYS allows to name output files e.g. "***.plt", where the three
+        # stars are a placeholder for the deck file name.
+        for i, file in enumerate(self.result_files):
+            file, n = re.subn(r'\*\*\*', repl=self.file_name, string=file)
+            self.result_files[i] = file
+            if n > 0:
+                logger.debug('Replaced placeholder "***" with deck file ' +
+                             'name in the assigned file ' + file)
 
     def find_equations(self, iteration=5):
         '''Find equations with key and value (separated by '=') in the text
