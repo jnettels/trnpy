@@ -321,7 +321,7 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
         r_list.append(r)
     p.legend.click_policy = 'hide'
     p.xaxis.axis_label = x_col
-    p.toolbar.autohide = True
+#    p.toolbar.autohide = True  # TODO Seems bugged
 
     # Create HoverTool
     tips_list = [(col, "@{"+col+"}") for col in tips_cols]
