@@ -226,10 +226,75 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     p.legend.background_fill_alpha = 0.5
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
-    p.toolbar.autohide = True
+#    p.toolbar.autohide = True  # TODO Seems bugged
     if y_label is not None:
         p.yaxis.axis_label = y_label
     return p
+
+
+def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
+                            y_cols_line=[], y_cols_stacked=[],
+                            palette=palette_default, **kwargs):
+    '''Create sorted annual load curve. The lines can be plotted as is, or
+    stacked.
+    '''
+    from pandas.tseries.frequencies import to_offset
+
+    fig_list = []  # List of Bokeh figure objects
+
+    for hash_ in sorted(set(df.index.get_level_values(index_level))):
+        df_plot = df.loc[(hash_, slice(None), slice(None)), :]  # use hash only
+        df_plot = df_plot.reset_index()  # Remove index
+        df_plot.set_index(x_col, inplace=True)  # Make time the only index
+
+        # Create index for x axis of new plot
+        freq = pd.to_timedelta(to_offset(pd.infer_freq(df_plot.index)))
+        timedelta = df_plot.index[-1] - (df_plot.index[0] - freq)
+        index = pd.timedelta_range(start=freq, end=timedelta, freq=freq,
+                                   name=x_col) / pd.Timedelta(1, 'h')
+
+        # Create a new DataFrame and fill it with the sorted values
+        df_sorted_line = pd.DataFrame(index=index)
+        for y_col in y_cols_line:
+            sort = df_plot.sort_values(by=y_col, axis=0, ascending=False)
+            df_sorted_line[y_col] = sort[y_col].values
+
+        df_sorted_stacked = pd.DataFrame(index=index)
+        for y_col in y_cols_stacked:
+            sort = df_plot.sort_values(by=y_col, axis=0, ascending=False)
+            df_sorted_stacked[y_col] = sort[y_col].values
+
+        df_sorted_stacked.fillna(value=0, inplace=True)
+        df_sorted_stacked = df_sorted_stacked.cumsum(axis=1, skipna=False)
+
+        # Create the Bokeh source object used for plotting
+        source_line = ColumnDataSource(data=df_sorted_line)
+        source_stacked = ColumnDataSource(data=df_sorted_stacked)
+
+        p = figure(title=str(hash_), **kwargs)
+        for y_col, color in zip(y_cols_line, palette):
+            p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+                   source=source_line, color=color, name=y_col)
+
+        for y_col, color in zip(y_cols_stacked, palette[len(y_cols_line):]):
+            p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+                   source=source_stacked, color=color, name=y_col)
+
+        hover = HoverTool(tooltips='$name: @$name')
+        p.add_tools(hover)
+        p.legend.location = "top_right"
+        p.legend.click_policy = "hide"
+        p.legend.label_text_font_size = '8pt'
+        p.legend.spacing = 1
+        p.legend.padding = 5
+#        p.toolbar.autohide = True  # TODO Seems bugged
+
+        if y_label is not None:
+            p.yaxis.axis_label = y_label
+
+        fig_list.append(p)
+
+    return fig_list
 
 
 def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
