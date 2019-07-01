@@ -157,8 +157,10 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
 
 
 def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
-                       palette=palette_default, y_label=None, **kwargs):
+                       palette=palette_default, y_label=None,
+                       sum_circle_size=0, **kwargs):
     '''Create stacked vertical bar plot in Bokeh from TRNSYS results.
+    If ``sum_circle_size`` is set ``> 0`` a circle with the sum is plotted.
 
     The x-axis will have two groups: hash and TIME.
 
@@ -169,7 +171,10 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     # Prepare Data
     df = df_in.reset_index()  # Remove index
 
+    # Make 'negative' values actually negative
     df[stack_labels_neg] = df[stack_labels_neg] * -1
+    # Calculate new column 'sum' with sum of each row
+    df['sum'] = df[stack_labels].sum(axis=1) + df[stack_labels_neg].sum(axis=1)
 
     group_names = ['hash', 'TIME']
     for col in group_names:
@@ -199,10 +204,15 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
                          color=palette_neg, name=stack_labels_neg,
                          legend=[x+" " for x in stack_labels_neg],
                          )
+    r_circ = []
+    if sum_circle_size > 0:
+        r = p.circle(x_sel, 'sum', source=source, legend='Sum', name='sum',
+                     color=palette[len(stack_labels)+1], size=sum_circle_size)
+        r_circ.append(r)
 
     # Create HoverTool
     tips_list = [(col, "@{"+col+"}") for col in tips_cols]
-    for r in r_pos+r_neg:
+    for r in r_pos+r_neg+r_circ:
         label = r.name
         hover = HoverTool(tooltips=[(label, "@{"+label+"}"), *tips_list],
                           renderers=[r])
