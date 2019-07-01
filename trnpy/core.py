@@ -67,6 +67,7 @@ class TRNExe(object):
                  mode_exec_parallel=False,
                  n_cores=0,
                  check_vital_sign=True,
+                 pause_after_error=False,
                  ):
         '''
         The optional argument n_cores allows control over the used CPU cores.
@@ -96,6 +97,7 @@ class TRNExe(object):
         self.mode_exec_parallel = mode_exec_parallel
         self.n_cores = n_cores
         self.check_vital_sign = check_vital_sign
+        self.pause_after_error = pause_after_error
 
     def run_TRNSYS_dck(self, dck):
         '''Run a TRNSYS simulation with the given deck dck_file.
@@ -138,6 +140,14 @@ class TRNExe(object):
         if self.check_log_for_errors(dck) is False or dck.success is False:
             dck.success = False
             logger.debug('Finished PID ' + str(proc.pid) + ' with errors')
+
+            if self.pause_after_error:  # and not self.mode_exec_parallel:
+                logger.error('Errors in ' + dck.file_path_dest)
+                for i, error_msg in enumerate(dck.error_msg_list):
+                    print('  '+str(i)+': '+error_msg)
+                    print('')  # Finish with an empty line
+                input('Press enter key to continue with next simulation.\n')
+
         else:
             logger.debug('Finished PID ' + str(proc.pid))
             dck.success = True
