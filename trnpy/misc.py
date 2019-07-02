@@ -526,7 +526,7 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    tol=0.001, random_state=1, plots_show=False,
                    plots_dir=r'.\Result', load_optimizer_pickle_file=None,
-                   kill_file='optimizer.yaml', **skopt_kwargs):
+                   opt_cfg='optimizer.yaml', **skopt_kwargs):
     '''Perform optimization for a TRNSYS-Simulation with scikit-optimize.
     https://scikit-optimize.github.io/#skopt.Optimizer
 
@@ -584,7 +584,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         instance dumped before with pickle. This allows to continue a
         previous optimization process. Default is ``None``.
 
-        kill_file (str, optional): A path to a yaml file. If it contains
+        opt_cfg (str, optional): A path to a yaml file. If it contains
         the entry ``kill: True``, the optimization is stopped before the next
         round. Default is ``"optimizer.yaml"``
 
@@ -602,7 +602,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         returned as a ``OptimizeResult`` object.
     '''
     import skopt
-    from skopt.plots import plot_evaluations, plot_objective
+    import skopt.plots
     import pickle
 
     if n_cores == 0:  # Set number of CPU cores to use
@@ -623,18 +623,40 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         )
 
     # Start the optimization loop
-    for count in range(1, n_calls+1):
-        logger.info('Optimizer: Starting iteration round '+str(count))
+    round_ = 1
+    count = len(sk_optimizer.Xi)  # calls to evaluation function
+    user_next_x = []  # Can be filled from yaml file
+    user_ask = False  # user_next_x is not used by default
+    eval_func_kwargs = dict()
+
+    while count <= n_calls:
+        logger.info('Optimizer: Starting iteration round '+str(round_)+' ('
+                    + str(count)+' simulations done).')
+
+        if user_ask and len(user_next_x) > 0:
+            next_x = user_next_x
+            logger.info('Simulating this round with user input: '+str(next_x))
+
+        else:
+            try:  # get points to evaluate
+                next_x = sk_optimizer.ask(n_points=n_cores)
+            except ValueError as ex:
+                logger.exception(ex)
+                continue
+
         try:
-            next_x = sk_optimizer.ask(n_points=n_cores)  # points to evaluate
-        except ValueError as ex:
+            param_table = pd.DataFrame.from_records(
+                    next_x, columns=opt_dimensions.keys())
+        except Exception as ex:
             logger.exception(ex)
             continue
-        param_table = pd.DataFrame.from_records(
-                next_x, columns=opt_dimensions.keys())
-        next_y = eval_func(param_table)  # evaluate points in parallel
+
+        round_ += 1  # increment round counter
+        count += len(next_x)  # counter for calls to evaluation function
+        # evaluate points in parallel
+        next_y = eval_func(param_table, **eval_func_kwargs)
         result = sk_optimizer.tell(next_x, next_y)
-        result.nit = count*n_cores
+        result.nit = count
         result.labels = list(opt_dimensions.keys())
 
         if result.fun < tol:
@@ -665,32 +687,63 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
 
             skopt.plots.plot_evaluations(result, dimensions=result.labels)
             if plots_dir is not None:
-                plt.savefig(os.path.join(plots_dir, r'skopt_evaluations.png'),
+                plt.savefig(os.path.join(plots_dir, 'skopt_evaluations.png'),
                             bbox_inches='tight')
-            try:  # plot_objective might fail
+            try:  # plot_objective fails before n_initial_points are done
                 skopt.plots.plot_objective(result, dimensions=result.labels)
-            except IndexError as ex:
-                logger.error('Error "' + str(ex) + '". Probably not enough ' +
-                             'data to plot partial dependence')
+            except IndexError:
+                logger.info('Not yet enough data to plot partial dependence.')
             else:
                 if plots_dir is not None:
-                    plt.savefig(os.path.join(plots_dir, r'skopt_objective.png'),
+                    plt.savefig(os.path.join(plots_dir, 'skopt_objective.png'),
                                 bbox_inches='tight')
 
-        # A yaml file in the current working directory allows to stop
-        # the optimization and proceed with the program
+        # A yaml file in the current working directory allows to manipulate
+        # the optimization during runtime:
+        # Change n_cores; set next points; terminate optimizer
         try:
-            kill_dict = yaml.load(open(kill_file, 'r'), Loader=yaml.FullLoader)
-            if kill_dict.get('kill', False):
-                logger.critical('Optimizer: Killed by file '+kill_file)
-                kill_dict['kill'] = False
-                yaml.dump(kill_dict, open(kill_file, 'w'),
-                          default_flow_style=False)
+            opt_dict = yaml.load(open(opt_cfg, 'r'), Loader=yaml.FullLoader)
+
+            # Overwrite number of cores with YAML setting
+            n_cores = opt_dict.setdefault('n_cores', n_cores)
+
+            # Next evaluation points given as user input
+            user_ask = opt_dict.setdefault('user_ask', False)  # Boolean
+            args_list = opt_dict.setdefault('user_range_prod', [])  # range
+            try:
+                # Input must be given in standard range() notation as a list
+                # for each dimension
+                user_next_x = convert_user_next_ranges(args_list)
+            except Exception as ex:
+                logger.exception(ex)
+
+            # To further customize the execution of the evaluation function,
+            # we can load any dict-styled keyword arguments from the YAML
+            # to pass on to the eval_func:
+            if user_ask:
+                eval_func_kwargs = opt_dict.setdefault('eval_func_kwargs',
+                                                       dict())
+            else:
+                eval_func_kwargs = dict()
+
+            # Take note: Kill the optimizer
+            kill = opt_dict.setdefault('kill', False)
+
+            # Reset some values to default
+            opt_dict['user_ask'] = False  # Reset the boolean
+            opt_dict['kill'] = False
+
+            # Save file with changed settings
+            yaml.dump(opt_dict, open(opt_cfg, 'w'),
+                      default_flow_style=None)
+
+            if kill:
+                logger.critical('Optimizer: Killed by file '+opt_cfg)
                 break
         except Exception:
             pass
 
-    logger.info('Optimizer: Best fit after '+str(count)+' rounds: '
+    logger.info('Optimizer: Best fit after '+str(count)+' simulations: '
                 + str(result.fun))
 
     if result.space.n_dims > 1:
@@ -699,6 +752,21 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             plt.show()
 
     return result
+
+
+def convert_user_next_ranges(args_list):
+    '''For each entry in the given list, use the items in that entry as input
+    for the range() function (start, stop, step). Then get the product of
+    all those ranges. This allows to manually define a grid of points for the
+    optimizer to simulate.
+    '''
+    import itertools
+    if len(args_list) > 0:
+        ranges = [range(*items) for items in args_list]
+        combis = list(itertools.product(*ranges))
+        return combis
+    else:
+        return []
 
 
 if __name__ == "__main__":
