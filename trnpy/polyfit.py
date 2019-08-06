@@ -1,22 +1,51 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Aug 15 14:17:44 2018
+'''
+**TRNpy: Parallelized TRNSYS simulation with Python**
 
-@author: nettelstroth
+Copyright (C) 2019 Joris Nettelstroth
 
-Library of functions for working with the results of optimizations in TRNpy.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-"""
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see https://www.gnu.org/licenses/.
+
+
+TRNpy: Parallelized TRNSYS simulation with Python
+=================================================
+Simulate TRNSYS deck files in serial or parallel and use parametric tables to
+perform simulations for different sets of parameters. TRNpy helps to automate
+these and similar operations by providing functions to manipulate deck files
+and run TRNSYS simulations from a programmatic level.
+
+Module Polyfit
+-----------
+This is a collection of functions for working with the results of
+optimizations in TRNpy. Most importantly, ``poly_fit_and_plot()`` allows
+to create fitted polynoms of from data in 2 or 3-dimensional space.
+
+These functions are quite experimental and adapted to specific tasks.
+
+'''
 import numpy as np
 import pandas as pd
 import os
-import trnpy
-import pickle
 import matplotlib as mpl         # Matplotlib
 import matplotlib.pyplot as plt  # Plotting library
+import logging
+
+# Define the logging function
+logger = logging.getLogger(__name__)
 
 
-def make_bokeh_colorbar(df, x, y, z):
+def make_bokeh_colorbar(df, x, y, z, file=None):
     '''Bokeh plot with colorbar.
     '''
     from bokeh.models import (ColumnDataSource, LinearColorMapper, BasicTicker,
@@ -49,7 +78,9 @@ def make_bokeh_colorbar(df, x, y, z):
                       )
     p.add_tools(hover)
 
-    output_file(os.path.join(os.path.dirname(file), 'color_bar.html'))
+    if file is not None:
+        output_file(os.path.join(os.path.dirname(file), 'color_bar.html'))
+
     show(p)
 
 
@@ -74,7 +105,7 @@ def polyfit2d(x, y, f, order):
     vander = np.polynomial.polynomial.polyvander2d(x, y, deg)
     vander = vander.reshape((-1, vander.shape[-1]))
     f = f.reshape((vander.shape[0],))
-    c = np.linalg.lstsq(vander, f)[0]
+    c = np.linalg.lstsq(vander, f, rcond=None)[0]
     return c.reshape(deg+1)
 
 
@@ -95,6 +126,8 @@ def format_axis_futureSuN(ax):
         * space as thousands separator
         * rotation
     '''
+    import locale
+    locale.setlocale(locale.LC_ALL, '')  # Use space as thousands separator
     ax.get_xaxis().set_major_formatter(  # Use space as thousands separator
         mpl.ticker.FuncFormatter(lambda x, p: format(int(x), 'n')))
     ax.get_yaxis().set_major_formatter(  # Use space as thousands separator
@@ -102,10 +135,17 @@ def format_axis_futureSuN(ax):
     ax.xaxis.set_tick_params(rotation=30)  # rotation is useful sometimes
 
 
-def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
-                        title=None, nx=20, ny=20, show_plot=True,
-                        print_formula=False, input_fig_ax=None,
-                        limits_xy=None):
+def poly1d_fit_and_plot(
+        x, y, c_axis=None, order=2,
+        x_label='', y_label='', z_label='',
+        title=None, label_fit='Fit', nx=20, ny=None, show_plot=True,
+        print_formula=False, input_fig_ax=None,
+        limits_xy=None, plot_fit_curve=False,
+        plot_scatter_solution=False,
+        plot_scatter=True, savedir=False, savefile='2D-plot.png',
+        savefig_args=dict(dpi=500, bbox_inches='tight', pad_inches=0.05),
+        contour_lines=False, color_scatter='red',
+        ):
     r'''Fit given data to a 1-D polynomial of given order. Plot input data
     and fittet data. Return a function representing the following equation:
 
@@ -118,12 +158,18 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
     '''
     import numpy as np
     import matplotlib.pyplot as plt
-    import locale
     from scipy.optimize import curve_fit
-    locale.setlocale(locale.LC_ALL, '')  # Use space as thousands separator
+
+    try:
+        if len(x) == 0:
+            return None
+    except TypeError:
+        if isinstance(x, float):
+            x = pd.Series(x)
+        if isinstance(y, float):
+            y = pd.Series(y)
 
     # Create 2d plot of input data
-
     if input_fig_ax is None:
         fig = plt.figure(figsize=(5, 5))
         ax = fig.gca()
@@ -131,7 +177,28 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
         # Plot all following elements onto an existing figure
         fig, ax = input_fig_ax
 
-#    ax.scatter(x, y, label='Lösungen')
+    if plot_scatter:
+        if c_axis is not None:
+            paths = ax.scatter(x, y, label=str(len(x))+' Lösungen',
+                               c=c_axis, cmap='plasma')
+#            paths = ax.scatter(x[1:], y[1:], label=str(len(x)-1)+' Lösungen',
+#                               c=c_axis[1:], cmap='plasma')
+            fig.colorbar(  # regular colorbar
+                    paths,
+                    ax=ax,
+                    # fraction=0.046, pad=0.04,
+                    label=z_label)
+
+            if contour_lines:
+                CS = ax.tricontour(x, y, c_axis, cmap='plasma')
+                plt.clabel(CS, inline=1, fontsize=10)
+
+        else:
+            ax.scatter(x, y, label=str(len(x))+' Lösungen', c=color_scatter)
+
+    if plot_scatter_solution:
+        ax.scatter(x[:1], y[:1], c='green', label='Optimum', s=100, zorder=10)
+
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     if title is not None:
@@ -144,35 +211,62 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
     if order >= 0:
         c = np.polyfit(x, y, deg=order)
         poly = np.poly1d(c)
+        if print_formula:
+            print('x = '+x_label+'; y = '+y_label)
+            print(np.poly1d(poly))
 
-    else:
+    elif order == -3:
         def func_fit(x, a, b, c):
             return a * np.power(x, b) + c
         popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000, method='trf')
 
         def poly(x):
             return func_fit(x, *popt)
+        if print_formula:
+            print('x = '+x_label+'; f(x) = '+y_label)
+            print('a * x^b + c:', str(popt))
+
+    elif order == -4:
+        def func_fit(x, a, b, c, d):
+            return a * np.power(x+b, c) + d
+        popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000, method='trf')
+
+        def poly(x):
+            return func_fit(x, *popt)
+        if print_formula:
+            print('x = '+x_label+'; f(x) = '+y_label)
+            print('a * (x+b)^c + d:', str(popt))
+
+    elif order == -5:
+        def func_fit(x, a, b, c, d, e):
+            return a * np.power(x+b, c) + d + e*x
+        popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000, method='trf')
+
+        def poly(x):
+            return func_fit(x, *popt)
+        if print_formula:
+            print('x = '+x_label+'; f(x) = '+y_label)
+            print('a * (x+b)^c + d + e*x:', str(popt))
+
+    else:
+        raise ValueError('Order for fitting not defined: '+str(order))
 
     # Continue plotting
     xx = np.linspace(x.min(), x.max(), nx)
     yy = poly(xx)
     next(ax._get_lines.prop_cycler)['color']
-#    ax.plot(xx, yy, label='Fit')
+    if plot_fit_curve:
+        ax.plot(xx, yy, label=label_fit)
 
+    plt.legend(loc='upper center', ncol=7, bbox_to_anchor=(0.5, 1.1))
     if show_plot:
-        plt.legend(loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.1))
         plt.show()
-        fig.savefig(os.path.join(os.path.dirname(file), '2D-plot.png'),
-                    dpi=500, bbox_inches='tight', pad_inches=0.05)
+    if savedir:
+        fig.savefig(os.path.join(savedir, savefile),
+                    **savefig_args)
 
-    if print_formula:
-        if order >= 0:
-            print(np.poly1d(poly))
-        else:
-            print('a * x^b + c')
-            print(popt)
-
-    def func(xi, check_confidence=True):
+    def func(xi, check_confidence=True, filter_confidence=False,
+             show_plot=False):
         '''Return the results of the fitted polynom, calculated for the given
         input.
         '''
@@ -187,10 +281,10 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
         ax.set_ylabel(y_label)
         format_axis_futureSuN(ax)
 
-        if check_confidence:
-            inside = xi[(xi >= x.min()) & (xi <= x.max())]
-            outside = xi[(xi < x.min()) | (xi > x.max())]
+        inside = xi[(xi >= x.min()) & (xi <= x.max())]
+        outside = xi[(xi < x.min()) | (xi > x.max())]
 
+        if check_confidence:
             ax.scatter(inside, result[inside.index], color='green',
                        label='Auswahl')
             if len(outside) > 0:
@@ -199,10 +293,16 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
         else:
             ax.scatter(xi, result[xi.index], color='green', label='Auswahl')
 
-        plt.legend(loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt.show()
-        fig.savefig(os.path.join(os.path.dirname(file), 'fitted_data.png'),
-                    dpi=500, bbox_inches='tight', pad_inches=0.05)
+        plt.legend(loc='upper center', ncol=6, bbox_to_anchor=(0.5, 1.1))
+
+        if show_plot:
+            plt.show()
+        if savedir:
+            fig.savefig(os.path.join(savedir, 'fitted_data.png'),
+                        **savefig_args)
+
+        if check_confidence:
+            result[outside.index] = float('NaN')
 
         return result
 
@@ -210,8 +310,10 @@ def poly1d_fit_and_plot(x, y, order=2, x_label='', y_label='', z_label='',
 
 
 def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
-                        title='', nx=20, ny=20, show_plot=True,
-                        print_formula=False):
+                        title='', nx=20, ny=20, show_plot=True, c_axis=None,
+                        print_formula=False, plot_fit_curve=True,
+                        savedir=False, savefile='3D-plot.png',
+                        savefig_args=dict()):
     '''Fit given data to a 2-D polynomial of given order. Plot input data
     and fittet data. Return a function representing the following equation:
 
@@ -221,10 +323,40 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     from mpl_toolkits.mplot3d import Axes3D  # for plot_trisurf
     from matplotlib import cm
 
+    def make_colormap(seq):
+        """Return a LinearSegmentedColormap
+        seq: a sequence of floats and RGB-tuples. The floats should be
+        increasing and in the interval (0,1).
+        """
+        import matplotlib.colors as mcolors
+        cdict = {'red': [], 'green': [], 'blue': []}
+
+        # make a lin_space with the number of records from seq.
+        x = np.linspace(0, 1, len(seq))
+
+        for i in range(len(seq)):
+            segment = x[i]
+            tone = seq[i]
+            cdict['red'].append([segment, tone, tone*.5])
+            cdict['green'].append([segment, tone, tone])
+            cdict['blue'].append([segment, tone, tone])
+
+        return mcolors.LinearSegmentedColormap('CustomMap', cdict)
+
+    if c_axis is None:
+        color_map = cm.plasma
+    else:
+        color_map = make_colormap(c_axis/max(c_axis))
+
     # Create 3d plot of input data
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    ax.plot_trisurf(x, y, z, cmap=cm.plasma, linewidth=0, antialiased=True)
+    surf = ax.plot_trisurf(x, y, z, cmap=color_map,
+                           linewidth=0, antialiased=True)
+
+    if c_axis is not None:
+        # Add a color bar which maps values to colors.
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
 
     # Add annotations
     ax.text2D(0.01, 0.99, title, transform=ax.transAxes)
@@ -232,7 +364,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     ax.set_ylabel(y_label)
     ax.set_zlabel(z_label)
 
-    if order >= 0:
+    if order >= 0 and plot_fit_curve:
         # Fit a 2d polynomial of given order
         c = polyfit2d(x, y, z, order=order)  # get array of coefficients
 
@@ -246,13 +378,12 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         y_list = [item for sublist in yy for item in sublist]
         z_list = [item for sublist in zz for item in sublist]
         ax.set_zlim([z.min()/1.1, z.max()*1.1])
-        ax.plot_trisurf(x_list, y_list, z_list, cmap=cm.viridis, linewidth=0,
-                        antialiased=True)
+        surf = ax.plot_trisurf(x_list, y_list, z_list, cmap=cm.viridis,
+                               linewidth=0, antialiased=True, alpha=0.8)
 
         # Alternative: 2-D contour plot
         plt.figure()
         CS = plt.contour(xx, yy, zz)
-    #    CS = plt.contour(xx, zz, yy)  # TODO debugging
         plt.clabel(CS, inline=1, fontsize=10)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
@@ -264,21 +395,37 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
 
     if show_plot:
         plt.show()
+    if savedir:
+        # Set rotation angle to 30 degrees
+        ax.view_init(azim=230)
+        fig.savefig(os.path.join(savedir, savefile), **savefig_args)
 
     if print_formula:
         # Create string representation of the full formula
-        forumula = 'f(x,y) = 0'
+        forumula1 = 'f(x,y) = 0'
+        forumula2 = 'f(x,y) = 0'
         for i, row in enumerate(c):
             for j, val in enumerate(row):
-#                forumula += ' + '+str(val)+'*pow(x, '+str(i)+')*pow(y, '+str(j)+')'
-                forumula += ' + '+str(val)+'*x^'+str(i)+'*y^'+str(j)
-        print(forumula)
+                forumula1 += ' + '+str(val)+'*x^'+str(i)+'*y^'+str(j)
+                forumula2 += ' + '+str(val)+'*pow(x, '+str(i)+')*pow(y, '\
+                             + str(j)+')'
 
-    def func(xi, yi, check_confidence=False):
+        txt = 'x = '+x_label+'; y = '+y_label+'; f(x,y) = '+z_label+'\n'\
+              + forumula1 + '\n' + forumula2 + '\n'
+        logger.info('Formula for 2D polynomial in '+savefile+':\n'+txt)
+        if savedir:
+            with open(os.path.join(savedir, 'formulae.txt'), 'a+') as f:
+                f.write(savefile+':\n')
+                f.write(txt+'\n')
+
+    def func(xi, yi, check_confidence=False, show_plot=False,
+             contains_radius=1, savefile=False, savefig_args=dict()):
         '''Return the results of the fitted polynom, calculated for the given
         input.
 
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
+
+        TODO: The hull vertices are not rendered as a closed line
         '''
         import matplotlib.patches as patches
         from scipy.spatial import ConvexHull
@@ -286,29 +433,46 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         result = np.polynomial.polynomial.polyval2d(xi, yi, c)
 
         if check_confidence:
+            # Create coloured points that marks the confidence area
             points = np.array([x, y]).T
             hull = ConvexHull(points)
+            # vertices are a list of coordinates that mark the boundaries
             vertices = np.array([points[hull.vertices, 0],
                                  points[hull.vertices, 1]]).T
             bbPath = mplPath.Path(vertices)
 
 #            plt.figure()
-            ax.plot(points[hull.vertices,0], points[hull.vertices,1], 0, 'r--', lw=2)
+            zlim_low = ax.get_zlim()[0]  # Show boundaries at bottom of z-axis
+            ax.plot(points[hull.vertices, 0], points[hull.vertices, 1],
+                    zlim_low, 'r--', lw=2)  # Plot boundaries as red line (3D)
             fig2, ax2 = plt.subplots()
-            ax2.plot(points[hull.vertices,0], points[hull.vertices,1], 0, 'r--', lw=2)
-            patch = patches.PathPatch(bbPath, facecolor='orange', alpha=0.1, lw=1)
+            ax2.plot(points[hull.vertices, 0], points[hull.vertices, 1],
+                     'r--', lw=2)  # Plot boundaries as red line (2D)
+            patch = patches.PathPatch(bbPath, facecolor='orange', alpha=0.1,
+                                      lw=1)
             ax2.add_patch(patch)
             ax2.set_xlim(x.min(), x.max())
             ax2.set_ylim(y.min(), y.max())
-            check = bbPath.contains_points(np.array([xi, yi]).T)  # radius=100
+            # Check if points xi, yi are contained within bbPath
+            check = bbPath.contains_points(np.array([xi, yi]).T,
+                                           radius=contains_radius,
+                                           )
             for i, point in enumerate(np.array([xi, yi]).T):
                 if check[i]:
-                    ax.scatter(point[0], point[1],  0, s=40, marker='^', color='green')
-                    ax2.scatter(point[0], point[1], s=40, marker='^', color='green')
+                    ax.scatter(point[0], point[1], zlim_low,
+                               s=40, marker='^', color='green')
+                    ax2.scatter(point[0], point[1], s=40, marker='^',
+                                color='green')
                 else:
-                    ax.scatter(point[0], point[1],  0, s=40, marker='^', color='red')
-                    ax2.scatter(point[0], point[1], s=40, marker='^', color='red')
-            plt.show()
+                    ax.scatter(point[0], point[1],  zlim_low,
+                               s=40, marker='^', color='red')
+                    ax2.scatter(point[0], point[1], s=40, marker='^',
+                                color='red')
+            if show_plot:
+                plt.show()
+
+            if savefile:
+                fig.savefig(savefile, **savefig_args)
 
             for i, confidence in enumerate(check):
                 if confidence == False:  # 'confidence is False' fails
@@ -319,7 +483,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     return func  # Return the function object
 
 
-def make_nomograph(func):
+def make_nomograph(func, file):
     '''Create nomograph with pynomo.
 
     Variant: x-axis: V_Sp, y-axis: A_PV, contour: WP_multi
@@ -372,7 +536,11 @@ def make_nomograph(func):
     Nomographer(main_params)
 
 
-def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None):
+def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
+                 plot_empty=False, contour_tricontour=False,
+                 contour_lines=False, ):
+    '''Create matplotlib contour plots along with a colorbar next to the plot.
+    '''
 
     fig = plt.figure()
 #    fig = plt.figure(figsize=(5, 5))
@@ -383,229 +551,96 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None):
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
-    ax.plot(x, y, 'ko', ms=3, label='%d Simulationen' % len(x))
-#    ax.plot(x, y, 'ko', ms=0, label='Simulationen')  # invisible dots
 
-    n_levels = np.linspace(0, 0.48, num=49)
-#    ax.tricontour(x, y, z, levels=n_levels, linewidths=0.5, colors='k')
-    cntr = ax.tricontourf(x, y, z, levels=n_levels, cmap="viridis_r")
-    fig.colorbar(cntr, ax=ax, label='Fehler')  # regular colorbar
-    plt.legend(loc='upper center', ncol=3, bbox_to_anchor=(0.5, 1.1))
+#    n_levels = np.linspace(0, 0.48, num=49)  # For colorbar
+    n_levels = np.linspace(0, 0.6, num=55)  # For colorbar
+#    n_levels = np.linspace(0, 0.6, num=11)  # For colorbar
 
-    # Manualy draw colorbar on empty plot
-#    cax, _ = mpl.colorbar.make_axes(ax)
-#    norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
-#    mpl.colorbar.ColorbarBase(cax, cmap="viridis_r", norm=norm, label='Fehler',
-#                              ticks=np.linspace(0, 0.5, num=11),)
+    if plot_empty:
+        ax.plot(x, y, 'ko', ms=0, label='Simulationen')  # invisible dots
+#        ax.set_title('%d Simulationen' % len(x))
 
-#    ax.set_title('%d Simulationen' % len(x))
+        # Manualy draw colorbar on empty plot
+        cax, _ = mpl.colorbar.make_axes(ax)
+        norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
+        mpl.colorbar.ColorbarBase(cax, cmap="viridis_r", norm=norm,
+                                  label='Fehler',
+                                  format='%.2f',
+                                  ticks=np.linspace(0, 0.6, num=10),
+                                  )
+    else:
+        ax.plot(x, y, 'ko', ms=3, label='%d Simulationen' % len(x))
+
+        if contour_lines:
+            CS = ax.tricontour(x, y, z, levels=n_levels, linewidths=0.5,
+                               colors='k')
+            plt.clabel(CS, inline=1, fontsize=10)
+
+        cntr = ax.tricontourf(x, y, z, levels=n_levels, cmap="viridis_r")
+        fig.colorbar(cntr, label='Fehler',
+                     ax=ax,
+                     format='%.2f',
+#                     fraction=0.046, pad=0.04,
+#                     cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
+                     )  # regular colorbar
+
+    plt.legend(loc='upper center', ncol=8, bbox_to_anchor=(0.5, 1.1))
 
     return fig, ax
 
 
-def build_gif(df, x, y, x_label='', y_label=''):
+def build_gif(df, x, y, savedir, x_label='', y_label='',
+              speed_double=False, speed_test=False, limits_xy=None,
+              savefig_args=dict(dpi=100, bbox_inches='tight', pad_inches=0.05,
+                                format='png'),
+              ):
+    '''Create GIF animations from a DataFrame containing the "history" of an
+    optimization run
+    '''
     import imageio
     import io
     import shutil
 
-    with imageio.get_writer(os.path.join(os.path.dirname(file), 'contour.gif'),
+    if limits_xy is None:
+        limits_xy = (min(df[x]), max(df[x]), min(df[y]), max(df[y]))
+
+    with imageio.get_writer(os.path.join(savedir, '1_contour.gif'),
                             mode='I') as writer:
         for i in range(len(df)):
-            print(' GIF', i, len(df), end='\r')
+            if logger.isEnabledFor(logging.INFO):
+                print(' GIF', i, len(df), end='\r')
             if i < 3:
                 continue
-#            if i > 15:
-#                break
-#            if not i % 2:
-#                continue
+            if speed_test:
+                if i > 15:
+                    break
+            if speed_double:
+                if not i % 2:
+                    continue
             fig, ax = plot_contour(df.loc[:i, x], df.loc[:i, y],
                                    df.loc[:i, 'error'], x_label=x_label,
                                    y_label=y_label, z_label='Fehler',
-                                   limits_xy=(min(df[x]), max(df[x]),
-                                              min(df[y]), max(df[y])))
+                                   limits_xy=limits_xy)
 #            plt.show()
             buffer = io.BytesIO()
-            fig.savefig(buffer, format='png', dpi=100, bbox_inches='tight',
-                        pad_inches=0.05)
+            fig.savefig(buffer, **savefig_args)
             plt.clf()
             plt.close('all')
             buffer.seek(0)
             image = imageio.imread(buffer)
             writer.append_data(image)
 
-        filename = os.path.join(os.path.dirname(file), 'contour.png')
+        logger.info('GIF finished')
+
+        filename = os.path.join(savedir, '2_contour_gif_end.png')
         with open(filename, 'wb') as f:
             buffer.seek(0)
             shutil.copyfileobj(buffer, f, length=131072)
             buffer.close()
 
-
-if __name__ == "__main__":
-    '''This is executed when the script is started directly with
-    Python, not when it is loaded as a module.
-    '''
-    mpl.style.use('../SuN-Plants/futureSuN.mplstyle')  # Personalized matplotlib style file
-
-# =============================================================================
-#     file = os.path.join(
-# #        r'C:\Trnsys17\Work\futureSuN\AP4\P2H_Quartier',
-#         r'C:\Trnsys17\Work\futureSuN\AP4\P2H_Quartier\Result',
-# #        r'C:\Trnsys17\Work\futureSuN\AP4\P2H_Quartier\Optimization\Result_181021 opt 0.9 CO2 ohne Einspeisung',
-# #        r'Optimization\Result_opt_13 PV_WP',
-# #        r'Optimization\Result_opt_14 VSp_WP',
-# #        r'C:\Trnsys17\Work\futureSuN\AP4\Sonnenkamp\Result',
-# #        'Result_180827 opt f_Sp=0.2',
-# #        'Result_180827 opt f_Sp=0.2 V_Sp fix',
-# #        'Result_opt_07',
-# #        'Result_opt_08 (490)',
-# #        'Result_opt_09',
-# #        'Result_opt_10',
-# #        'Result_opt_11 (644)',
-#         'opt_res.xlsx'
-# #        'opt_res_combine.xlsx'
-#                         )
-#     df = pd.read_excel(file)
-# =============================================================================
-
-    file = r'C:\Trnsys17\Work\futureSuN\AP4\P2H_Quartier\Result\opt_result.pkl'
-    with open(file, 'rb') as f:
-        opt_res = pickle.load(f)
-    df = pd.DataFrame(opt_res.x_iters, columns=opt_res.labels)
-    df['error'] = opt_res.func_vals
-#    df.sort_values(by='error', inplace=True)
-
-
-    # Old names
-    #x = 'VSp_m3'
-    #y = 'PV_A_brutto'
-    #z = 'WP_multiplier_max'
-#    x = 'PV_A_brutto'
-#    y = 'WP_multiplier_max'
-#    z = 'VSp_m3'
-#    x = 'VSp_m3'
-#    y = 'WP_multiplier_max'
-#    z = 'PV_A_brutto'
-
-    # New names
-    # WP vs. PV
-    x = 'P_th_WP_max_kW'
-    y = 'P_el_PV_kW'
-    z = 'VSp_m3'
-
-    # WP vs. EH
-#    x = 'P_th_WP_max_kW'
-#    y = 'E_el_EH_max_kW'
-#    z = 'VSp_m3'
-
-    # WP vs VSp
-#    x = 'VSp_m3'
-#    y = 'P_th_WP_max_kW'
-#    z = 'A_brutto_PV'
-
-    # WP vs. PV
-#    z = 'P_el_PV_kW'
-#    y = 'P_el_SN2WP_max_kW'
-#    x = 'VSp_m3'
-
-#    x = 'VSp_m3'
-#    y = 'P_th_WP_max_kW'
-#    y = 'A_brutto_PV'
-#    x = 's_iso_ref_m'
-#    y = 'error'
-
-    # Create plot with Bokeh
-#    make_bokeh_colorbar(df, x, y, 'error')
-
-    x_label = x
-    y_label = y
-    z_label = z
-
-    # WP vs. PV
-    x_label = r'$P_{th,WP}$ [kW]'
-    y_label = r'$P_{el,PV}$ [kWp]'
-
-    # WP vs. PV
-#    x_label = r'$P_{th,WP}$ [kW]'
-#    y_label = r'$P_{el,EH}$ [kWp]'
-
-    # WP vs VSp
-#    x_label = r'$V_{Sp}$ [m³]'
-#    y_label = r'$P_{th,WP}$ [kW]'
-
-    # WP vs. PV
-#    x_label = r'$P_{el,PV}$ [kWp]'
-#    y_label = r'$P_{el,SN,WP,max}$ [kW]'
-
-#    y_label = r'$P_{th,WP,max}$ [kW]'
-#    y_label = r'$A_{brutto,PV}$ [m²]'
-#    z_label = r'$V_{Sp}$ [m³]'
-
-#    build_gif(df, x, y, x_label=x_label, y_label=y_label)
-
+    # Also create an empty starting plot for the GIF
     fig, ax = plot_contour(df[x], df[y], df['error'], x_label=x_label,
                            y_label=y_label, z_label='Fehler',
-                           limits_xy=(min(df[x]), max(df[x]), min(df[y]), max(df[y])))
-
-#    print(df)
-    limit_error = 0.01
-#    limit_error = 0.002
-#    limit_error = 0.8
-#    limit_error = 1
-
-    df = df[df['error'] < limit_error]
-#    df = df[df['P_th_WP_max_kW'] < 20000]
-#    df = df[df['P_th_WP_max_kW'] < 1200]
-#    df = df[df['E_el_EH_max_kW'] < 1100]
-#    df = df[df['P_th_WP_max_kW'] < 1200]
-#    df = df[df['A_brutto_PV'] < 50000]
-#    df = df[df['P_el_PV_kW'] < 5500]
-#    df = df[df['VSp_m3'] > 100]
-#    print(df.head())
-#    print(df)
-    print(len(df))
-
-    # Make a fit
-#    df.sort_values(by=x, inplace=True)
-#    func = poly2d_fit_and_plot(df[x], df[y], df[z], order=2,
-#    func = poly_fit_and_plot(df[x], df[y], z=df[z], order=2,
-    func = poly_fit_and_plot(df[x], df[y], order=-2,
-                             x_label=x_label, y_label=y_label, z_label=z_label,
-                             nx=30, ny=30,
-#                             title='Points with error < '+str(limit_error),
-                             title='',
-                             show_plot=True,
-                             print_formula=True,
-                             input_fig_ax=(fig, ax),
-#                             limits_xy=(min(df[x]), max(df[x]), min(df[y]), max(df[y])),
-                             )
-#    df['calc'] = func(df[x], df[y])
-
-    # Use the fitted function to compute results
-    dck_proc = trnpy.DCK_processor()
-    param_table = dck_proc.parametric_table_combine({
-#        'VSp_m3': [5500, 6000, 10000, 14000, 18000],
-#        'VSp_m3': [60, 250, 500, 1000, 1500, 2000],
-#        'P_th_WP_max_kW': [2000],
-#        'VSp_m3': [50000],
-#        'P_th_WP_max_kW': [5500, 6000, 10000, 14000, 18000],
-        'P_th_WP_max_kW': [1600, 1700, 1800, 2000, 2350, 3000, 4000, 5000],
-#        'P_th_WP_max_kW': [1250, 1400] + list(range(1650, 7000, 500)),
-#        'P_th_WP_max_kW': [7000, 8000] + list(range(9000, 20000, 2000)),
-#        'P_th_WP_max_kW': list(range(1250, 2501, 250)),
-#        'A_brutto_PV': [20000, 24800, 32000, 36000, 40000],
-#        'P_el_PV_kW': list(range(0, 5001, 1000)) + [5530],
-#        'WP_multiplier_max': [45, 50, 55, 60, 65, ],
-#        'P_th_WP_max_kW': [4100, 4500, 5000, 5500, 6000, 6500, 7000],
-        })
-#    param_table[z] = func(param_table[x], param_table[y], check_confidence=True)
-#    param_table[y] = func(param_table[x], check_confidence=True)
-    param_table[y] = func(param_table[x], check_confidence=False)
-
-    param_table.dropna(axis='index', inplace=True)
-    param_table = param_table.round(decimals=0)
-    print(param_table)
-    file = os.path.join(r'C:\Trnsys17\Work\futureSuN\AP4\P2H_Quartier\!Parameter_fit.xlsx')
-    param_table.to_excel(file, index=False)
-
-    # Use the fitted function to create a nomograph
-#    make_nomograph(func)
+                           limits_xy=limits_xy, plot_empty=True)
+    filename = os.path.join(savedir, '0_contour_gif_start.png')
+    fig.savefig(filename, **savefig_args)
