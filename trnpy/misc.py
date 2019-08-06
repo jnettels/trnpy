@@ -600,10 +600,17 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     Returns:
         opt_res (OptimizeResult, scipy object): The optimization result
         returned as a ``OptimizeResult`` object.
+
+    TODO: Use named space dimensions instead of adding a ``labels`` list
+    to the result object. However, currently there are issues with the
+    dimension names getting lost at some point.
     '''
     import skopt
     import skopt.plots
     import pickle
+    import matplotlib as mpl
+
+    mpl.rcParams['font.size'] = 5  # Matplotlib setup: For evaluation plots
 
     if n_cores == 0:  # Set number of CPU cores to use
         n_cores = multiprocessing.cpu_count() - 1
@@ -612,6 +619,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         # Load an existing optimizer instance
         with open(load_optimizer_pickle_file, 'rb') as f:
             sk_optimizer = pickle.load(f)
+            result = sk_optimizer.get_result()
+            result.labels = list(opt_dimensions.keys())
             logger.info('Optimizer: Loaded existing optimizer instance '
                         + load_optimizer_pickle_file)
     else:
@@ -629,7 +638,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     user_ask = False  # user_next_x is not used by default
     eval_func_kwargs = dict()
 
-    while count <= n_calls:
+    while count < n_calls:
         logger.info('Optimizer: Starting iteration round '+str(round_)+' ('
                     + str(count)+' simulations done).')
 
@@ -688,7 +697,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             skopt.plots.plot_evaluations(result, dimensions=result.labels)
             if plots_dir is not None:
                 plt.savefig(os.path.join(plots_dir, 'skopt_evaluations.png'),
-                            bbox_inches='tight')
+                            bbox_inches='tight', dpi=200)
             try:  # plot_objective fails before n_initial_points are done
                 skopt.plots.plot_objective(result, dimensions=result.labels)
             except IndexError:
@@ -696,7 +705,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             else:
                 if plots_dir is not None:
                     plt.savefig(os.path.join(plots_dir, 'skopt_objective.png'),
-                                bbox_inches='tight')
+                                bbox_inches='tight', dpi=200)
 
         # A yaml file in the current working directory allows to manipulate
         # the optimization during runtime:
@@ -744,7 +753,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             pass
 
     logger.info('Optimizer: Best fit after '+str(count)+' simulations: '
-                + str(result.fun))
+                + str(result.fun) + '\n'
+                + pd.Series(data=result.x, index=result.labels).to_string()
+                )
 
     if result.space.n_dims > 1:
         if plots_show is True:
