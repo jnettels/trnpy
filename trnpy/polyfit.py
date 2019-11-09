@@ -120,8 +120,8 @@ def poly_fit_and_plot(x, y, z=None, **kwargs):
     return func
 
 
-def format_axis_futureSuN(ax):
-    '''futureSuN style format:
+def custom_axis_format(ax):
+    '''special style format:
 
         * space as thousands separator
         * rotation
@@ -143,7 +143,8 @@ def poly1d_fit_and_plot(
         limits_xy=None, plot_fit_curve=False,
         plot_scatter_solution=False,
         plot_scatter=True, savedir=False, savefile='2D-plot.png',
-        savefig_args=dict(dpi=500, bbox_inches='tight', pad_inches=0.05),
+        savefig_args=dict(dpi=500, bbox_inches='tight', pad_inches=0.05,
+                          transparent=True),
         contour_lines=False, color_scatter='red',
         ):
     r'''Fit given data to a 1-D polynomial of given order. Plot input data
@@ -205,7 +206,7 @@ def poly1d_fit_and_plot(
         ax.set_title(title)
     if limits_xy is not None:
         ax.axis(limits_xy)  # tuple of xmin, xmax, ymin, ymax
-    format_axis_futureSuN(ax)
+    custom_axis_format(ax)
 
     # Perform fitting
     if order >= 0:
@@ -240,13 +241,19 @@ def poly1d_fit_and_plot(
     elif order == -5:
         def func_fit(x, a, b, c, d, e):
             return a * np.power(x+b, c) + d + e*x
-        popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000, method='trf')
+        try:
+            popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000,
+                                   method='trf')
+        except ValueError:
+            popt, pcov = curve_fit(func_fit, x, y, maxfev=9000000, method='lm')
 
         def poly(x):
             return func_fit(x, *popt)
         if print_formula:
-            print('x = '+x_label+'; f(x) = '+y_label)
-            print('a * (x+b)^c + d + e*x:', str(popt))
+            logger.info('Curve fit for x = '+x_label+'; f(x) = '+y_label+'\n' +
+                        'f(x) = a * (x+b)^c + d + e*x\n' +
+                        'f(x) = {:.2E} * (x+{:.2E})^{:.2E} + {:.2E} + {:.2E}*x'
+                        .format(*popt))
 
     else:
         raise ValueError('Order for fitting not defined: '+str(order))
@@ -258,7 +265,7 @@ def poly1d_fit_and_plot(
     if plot_fit_curve:
         ax.plot(xx, yy, label=label_fit)
 
-    plt.legend(loc='upper center', ncol=7, bbox_to_anchor=(0.5, 1.1))
+    plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
     if show_plot:
         plt.show()
     if savedir:
@@ -279,7 +286,7 @@ def poly1d_fit_and_plot(
         ax.plot(xx, yy, color='#ff8021', label='Fit')
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
-        format_axis_futureSuN(ax)
+        custom_axis_format(ax)
 
         inside = xi[(xi >= x.min()) & (xi <= x.max())]
         outside = xi[(xi < x.min()) | (xi > x.max())]
@@ -293,7 +300,7 @@ def poly1d_fit_and_plot(
         else:
             ax.scatter(xi, result[xi.index], color='green', label='Auswahl')
 
-        plt.legend(loc='upper center', ncol=6, bbox_to_anchor=(0.5, 1.1))
+        plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
 
         if show_plot:
             plt.show()
@@ -313,15 +320,23 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                         title='', nx=20, ny=20, show_plot=True, c_axis=None,
                         print_formula=False, plot_fit_curve=True,
                         savedir=False, savefile='3D-plot.png',
-                        savefig_args=dict()):
+                        savefig_args=dict(), render='mayavi',
+                        save_transparent=False, nb_labels=6,
+                        contour_plot_2d=False):
     '''Fit given data to a 2-D polynomial of given order. Plot input data
     and fittet data. Return a function representing the following equation:
 
     .. math:: p(x,y) = \\sum_{i,j} c_{i,j} * x^i * y^j
+
+    3D plotting is done with matplotlib by default. Matplotlib is easier to
+    use, but does not visualize intersecting surface appropriately
+    (one surface is always shown in front of the other). As an alternative
+    render package MayaVi can be used.
     '''
     import matplotlib.path as mplPath
     from mpl_toolkits.mplot3d import Axes3D  # for plot_trisurf
     from matplotlib import cm
+    from mayavi import mlab
 
     def make_colormap(seq):
         """Return a LinearSegmentedColormap
@@ -348,15 +363,113 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     else:
         color_map = make_colormap(c_axis/max(c_axis))
 
-    # Create 3d plot of input data
+    # Create 3d plot of input data with matplotlib
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    surf = ax.plot_trisurf(x, y, z, cmap=color_map,
-                           linewidth=0, antialiased=True)
+    surf = ax.plot_trisurf(x, y, z, cmap=color_map, linewidth=0,
+                           antialiased=True)
+
+    if render == 'mayavi':
+        # Plotting alternative to matplotlib
+        # Axis grid is not yet solved
+        # https://stackoverflow.com/questions/54863564/mayavi-how-to-show-the-axes-grid
+
+        # Define the axis ranges and scaling
+        ax_ranges = [x.min(), x.max(),
+                     y.min(), y.max(),
+                     z.min(), z.max(),
+#                     0, round(z.max(), -len(str(int(z.max())))+1)
+                     ]
+        ax_scale = [2.0,
+                    2*(ax_ranges[1]-ax_ranges[0])/(ax_ranges[3]-ax_ranges[2]),
+                    1*(ax_ranges[1]-ax_ranges[0])/(ax_ranges[5]-ax_ranges[4]),
+                    ]
+        ax_extent = ax_ranges * np.repeat(ax_scale, 2)
+        x_conv = x*ax_scale[0]
+        y_conv = y*ax_scale[1]
+        z_conv = z*ax_scale[2]
+
+        # Create the MayaVi 3D figure
+        mfig = mlab.figure(bgcolor=(1, 1, 1),  # Make background white
+                           size=(1800, 1200))
+        mfig.scene.renderer.use_depth_peeling = 1  # For transparency
+#        mfig.scene.parallel_projection = True
+#        parallel_scale = 60  # For constant parallel_projection
+#        parallel_scale = 70  # For constant parallel_projection
+        parallel_scale = 120  # For constant parallel_projection
+
+        # Create and visualize the mesh (derived from irregular points)
+        pts = mlab.points3d(x_conv, y_conv, z_conv, z_conv, colormap='plasma',
+                            scale_mode='none', scale_factor=1.5)
+        mesh = mlab.pipeline.delaunay2d(pts)
+        surf1 = mlab.pipeline.surface(mesh, colormap='plasma')
+        surf1.actor.property.opacity = 1
+#        surf1.actor.actor.scale = ax_scale
+#        surf1.actor.property.lighting = False
+
+        # Create axis and outline (cube)
+        grid_color = (.7, .7, .7)
+        mlab.outline(surf1, color=grid_color, extent=ax_extent)
+        axes = mlab.axes(surf1, color=grid_color, nb_labels=nb_labels,
+                         extent=ax_extent, ranges=ax_ranges, line_width=2.5,
+                         xlabel=x_label, ylabel=y_label, zlabel=z_label)
+        axes.title_text_property.color = (0.3, 0.3, 0.3)
+        axes.label_text_property.color = (0.3, 0.3, 0.3)
+        axes.label_text_property.bold = False
+        axes.label_text_property.italic = False
+        axes.title_text_property.bold = False
+        axes.title_text_property.italic = False
+        axes.axes.label_format = '%.0f'
+#        axes.axes.label_format = '%.1f'
+        axes.property.display_location = 'background'
+        axes.axes.font_factor = 1.2  # font_size doesn't seem to work
+#        axes.axes.font_factor = 2.0  # font_size doesn't seem to work
+#        axes.axes.label_text_property.font_size = 4
+#        axes.label_text_property.font_family = 'times'
+#        axes.title_text_property.font_family = 'times'
+
+#        camera_light0 = mfig.scene.light_manager.lights[0]
+#        camera_light0.elevation = 90
+#        camera_light0.azimuth = 45
+#        camera_light0.intensity = 1.0
+
+        # Create axis grid
+        x_ticks = np.linspace(ax_ranges[0], ax_ranges[1], nb_labels)
+        y_ticks = np.linspace(ax_ranges[2], ax_ranges[3], nb_labels)
+        z_ticks = np.linspace(ax_ranges[4], ax_ranges[5], nb_labels)
+
+        tube_radius = 0.05
+#        tube_radius = 10.0
+
+        for tick in x_ticks:
+            _x = [tick*ax_scale[0], tick*ax_scale[0], tick*ax_scale[0]]
+            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1], y_ticks[0]*ax_scale[1]]
+            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2], z_ticks[-1]*ax_scale[2]]
+            mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
+        for tick in y_ticks:
+            _x = [x_ticks[0]*ax_scale[0], x_ticks[-1]*ax_scale[0], x_ticks[-1]*ax_scale[0]]
+            _y = [tick*ax_scale[1], tick*ax_scale[1], tick*ax_scale[1]]
+            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2], z_ticks[-1]*ax_scale[2]]
+            mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
+        for tick in z_ticks:
+            _x = [x_ticks[-1]*ax_scale[0], x_ticks[-1]*ax_scale[0], x_ticks[0]*ax_scale[0]]
+            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1], y_ticks[0]*ax_scale[1]]
+            _z = [tick*ax_scale[2], tick*ax_scale[2], tick*ax_scale[2]]
+            mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
+
+        # After(!) the first object has been placed, set the camera view
+        mlab_view = mlab.view(azimuth=115, elevation=76, distance=250,
+                              focalpoint='auto', figure=mfig)
+        mfig.scene.camera.parallel_scale = parallel_scale
 
     if c_axis is not None:
         # Add a color bar which maps values to colors.
         fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+#        cbar = mlab.colorbar(object=surf1, orientation='vertical', nb_labels=6)
+#        cbar.label_text_property.color = (0.3, 0.3, 0.3)
+#        cbar.label_text_property.bold = False
+#        cbar.label_text_property.italic = False
+#        cbar.data_range = [0.0, round(z.max(), -len(str(int(z.max())))+1)]
 
     # Add annotations
     ax.text2D(0.01, 0.99, title, transform=ax.transAxes)
@@ -381,13 +494,30 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         surf = ax.plot_trisurf(x_list, y_list, z_list, cmap=cm.viridis,
                                linewidth=0, antialiased=True, alpha=0.8)
 
+        if render == 'mayavi':
+            # Add the polyfit to the existing MayaVi figure
+            x_conv = np.array(x_list)*ax_scale[0]
+            y_conv = np.array(y_list)*ax_scale[1]
+            z_conv = np.array(z_list)*ax_scale[2]
+
+            # Create and visualize the mesh (derived from irregular points)
+            pts2 = mlab.points3d(x_conv, y_conv, z_conv, z_conv,
+                                 scale_mode='none', scale_factor=0,
+                                 colormap='viridis')
+            mesh2 = mlab.pipeline.delaunay2d(pts2)
+            surf2 = mlab.pipeline.surface(mesh2, colormap='viridis')
+#            surf2.actor.actor.scale = ax_scale
+            surf2.actor.property.opacity = 0.75
+#            surf2.actor.property.lighting = False
+
         # Alternative: 2-D contour plot
-        plt.figure()
-        CS = plt.contour(xx, yy, zz)
-        plt.clabel(CS, inline=1, fontsize=10)
-        plt.xlabel(x_label)
-        plt.ylabel(y_label)
-        plt.title(z_label)
+        if contour_plot_2d:
+            plt.figure()
+            CS = plt.contour(xx, yy, zz)
+            plt.clabel(CS, inline=1, fontsize=10)
+            plt.xlabel(x_label)
+            plt.ylabel(y_label)
+            plt.title(z_label)
 
     else:
         # order < 0: Do not perform fit
@@ -398,23 +528,35 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     if savedir:
         # Set rotation angle to 30 degrees
         ax.view_init(azim=230)
-        fig.savefig(os.path.join(savedir, savefile), **savefig_args)
+#        fig.savefig(os.path.join(savedir, savefile), **savefig_args)
+
+        if render == 'mayavi':
+            mlab.view(*mlab_view)  # Reset the view to previous settings
+            mfig.scene.camera.parallel_scale = parallel_scale
+            if save_transparent:
+                mfig.scene._lift()  # required for screenshot()
+                imgmap = mlab.screenshot(figure=mfig, mode='rgba',
+                                         antialiased=True)
+                plt.imsave(arr=imgmap, fname=os.path.join(savedir, savefile))
+            else:  # Regular image with background
+                mlab.savefig(os.path.join(savedir, savefile), figure=mfig,
+                             magnification=1)
 
     if print_formula:
         # Create string representation of the full formula
-        forumula1 = 'f(x,y) = 0'
-        forumula2 = 'f(x,y) = 0'
+        formula1 = 'f(x,y) = 0'
+        formula2 = 'f(x,y) = 0'
         for i, row in enumerate(c):
             for j, val in enumerate(row):
-                forumula1 += ' + '+str(val)+'*x^'+str(i)+'*y^'+str(j)
-                forumula2 += ' + '+str(val)+'*pow(x, '+str(i)+')*pow(y, '\
-                             + str(j)+')'
+                formula1 += ' + {:.3E}*x^{}*y^{}'.format(val, i, j)
+                formula2 += ' + {:.3E}*pow(x, {})*pow(y, {})'.format(val, i, j)
 
         txt = 'x = '+x_label+'; y = '+y_label+'; f(x,y) = '+z_label+'\n'\
-              + forumula1 + '\n' + forumula2 + '\n'
+              + formula1 + '\n' + formula2 + '\n'
         logger.info('Formula for 2D polynomial in '+savefile+':\n'+txt)
         if savedir:
-            with open(os.path.join(savedir, 'formulae.txt'), 'a+') as f:
+            with open(os.path.join(savedir, 'formulae.txt'), mode='a+',
+                      encoding="utf-8") as f:
                 f.write(savefile+':\n')
                 f.write(txt+'\n')
 
@@ -453,6 +595,19 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
             ax2.add_patch(patch)
             ax2.set_xlim(x.min(), x.max())
             ax2.set_ylim(y.min(), y.max())
+
+            if render == 'mayavi':
+                mlab.plot3d(  # Create closed line for boundaries
+                    np.append(points[hull.vertices, 0],
+                              points[hull.vertices, 0][0])*ax_scale[0],
+                    np.append(points[hull.vertices, 1],
+                              points[hull.vertices, 1][0])*ax_scale[1],
+#                    [zlim_low*ax_scale[2]]*(len(points[hull.vertices, 0])+1),
+                    [0]*(len(points[hull.vertices, 0])+1),
+                    tube_radius=0.33, opacity=0.5,
+                    representation='surface', figure=mfig,
+                    color=(0, 0.8, 0))
+
             # Check if points xi, yi are contained within bbPath
             check = bbPath.contains_points(np.array([xi, yi]).T,
                                            radius=contains_radius,
@@ -463,19 +618,42 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                                s=40, marker='^', color='green')
                     ax2.scatter(point[0], point[1], s=40, marker='^',
                                 color='green')
+                    if render == 'mayavi':
+                        mlab.points3d(
+                                point[0]*ax_scale[0], point[1]*ax_scale[1], 0,
+                                scale_factor=1, mode='sphere', figure=mfig,
+                                scale_mode='none', color=(0, 0.8, 0))
+
                 else:
                     ax.scatter(point[0], point[1],  zlim_low,
                                s=40, marker='^', color='red')
                     ax2.scatter(point[0], point[1], s=40, marker='^',
                                 color='red')
+                    if render == 'mayavi':
+                        mlab.points3d(
+                                point[0]*ax_scale[0], point[1]*ax_scale[1], 0,
+                                scale_factor=1, mode='sphere', figure=mfig,
+                                scale_mode='none', color=(0.8, 0, 0))
             if show_plot:
                 plt.show()
 
             if savefile:
                 fig.savefig(savefile, **savefig_args)
+                if render == 'mayavi':
+                    mlab.view(*mlab_view)  # Reset view to previous settings
+                    mfig.scene.camera.parallel_scale = parallel_scale
+                    if save_transparent:
+                        mfig.scene._lift()  # required for screenshot()
+                        imgmap = mlab.screenshot(figure=mfig, mode='rgba',
+                                                 antialiased=True)
+                        plt.imsave(arr=imgmap,
+                                   fname=os.path.join(savedir, savefile))
+                    else:  # Regular image with background
+                        mlab.savefig(os.path.join(savedir, savefile),
+                                     figure=mfig, magnification=1)
 
             for i, confidence in enumerate(check):
-                if confidence == False:  # 'confidence is False' fails
+                if confidence == False:  # 'if confidence is False' fails
                     result[i] = float('NaN')
 
         return result
@@ -547,7 +725,7 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
     ax = fig.gca()
     if limits_xy is not None:  # Set axis limits
         ax.axis(limits_xy)  # tuple of xmin, xmax, ymin, ymax
-    format_axis_futureSuN(ax)
+    custom_axis_format(ax)
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
@@ -584,7 +762,7 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
 #                     cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
                      )  # regular colorbar
 
-    plt.legend(loc='upper center', ncol=8, bbox_to_anchor=(0.5, 1.1))
+    plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
 
     return fig, ax
 
