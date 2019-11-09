@@ -314,10 +314,11 @@ class TRNExe(object):
                 text = '{:5.1f}% done. Time elapsed: {}'\
                        .format(fraction*100,
                                str(t_elapsed).split('.')[0])
-            # Do the print
-            print(text, end='\r')
+            # Do the print. Use \r twice to make it show in Spyder
+            # https://github.com/spyder-ide/spyder/issues/195
+            print('\r'+text, end='\r')
             time.sleep(1.0)  # Sleep a certain number of seconds
-        print('100.0% done.', end='\r')  # Finish the last output with 100%
+        print('\r 100.0% done.', end='\r')  # Finish the last output with 100%
         return
 
 
@@ -614,7 +615,7 @@ class DCK_processor(object):
         * ``dck_proc.copy_assigned_files(dck_list)``
 
         But you can manualy add other replacements before that, if required.
-        ``parametric_table`` may also be an DataFrame with nothing but an
+        ``parametric_table`` may also be a DataFrame with nothing but an
         index. This way you can define the unique indentifier ``hash`` used
         for each dck and perform more complex replacements manually.
 
@@ -704,10 +705,8 @@ class DCK_processor(object):
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
             re_find = r'(?P<key>\b'+key+r'\s?=\s?)(?P<value>.*)'
-#            re_find = r'(?P<key>\b'+key+'\s=\s)(?P<value>\W*\d*\W?\d*\n)'
             # Replace match with key (capture group) plus the new value
             re_replace = r'\g<key>'+str(value)
-#            re_replace = r'\g<key>'+str(value)+'\n'
             self.add_replacements({re_find: re_replace}, dck)
 
     def disable_plotters(self, dck):
@@ -795,7 +794,7 @@ class DCK_processor(object):
                                                             re_replace,
                                                             dck.dck_text)
                 if number_of_subs_made == 0 and print_warnings:
-                    logger.warning('Warning: Replacement not successful, ' +
+                    logger.warning('Replacement not successful, ' +
                                    'because regex was not found: '+re_find)
 
         return
@@ -970,7 +969,7 @@ class DCK_processor(object):
 
             if logger.isEnabledFor(logging.INFO):  # Print progress
                 frac = i/len(dck_list)*100
-                print('Collecting results: {:5.1f}%'.format(frac), end='\r')
+                print('\rCollecting results: {:5.1f}%'.format(frac), end='\r')
 
         logger.debug('Collected result files:')
         if logger.isEnabledFor(logging.DEBUG):
