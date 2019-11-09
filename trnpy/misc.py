@@ -35,7 +35,6 @@ by other modules such as Pandas, Bokeh, Scikit-Optimize and DataExplorer.
 import os
 import logging
 import multiprocessing
-import matplotlib.pyplot as plt  # Plotting library
 import pandas as pd
 import yaml
 from bokeh.command.bootstrap import main
@@ -195,6 +194,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
                          color=palette[0:len(stack_labels)],
                          name=stack_labels,
                          legend=[x+" " for x in stack_labels],
+                         line_width=0,  # Prevent outline for height of 0
                          )
     if len(stack_labels_neg) > 0:
         palette_neg = palette[-len(stack_labels_neg):]
@@ -203,6 +203,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     r_neg = p.vbar_stack(stack_labels_neg, x=x_sel, width=1, source=source,
                          color=palette_neg, name=stack_labels_neg,
                          legend=[x+" " for x in stack_labels_neg],
+                         line_width=0,  # Prevent outline for height of 0
                          )
     r_circ = []
     if sum_circle_size > 0:
@@ -222,6 +223,9 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
 #    hover = HoverTool(tooltips=[("$name ", "@$name"), *tips_list])
 #    p.add_tools(hover)
 
+    p.x_range.range_padding = 0.03  # Extra space on left and right borders
+    p.outline_line_color = None
+    p.xgrid.grid_line_color = None
     p.xaxis.major_label_orientation = 1.2
     p.legend.background_fill_alpha = 0.5
     p.legend.location = "top_left"
@@ -439,8 +443,9 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
     p.legend.label_text_font_size = '8pt'
-    p.legend.spacing = 1
-    p.legend.padding = 5
+    p.legend.spacing = 0
+    p.legend.padding = 2
+    p.title.text_font_size = '8pt'
 
     p.yaxis.major_label_orientation = "vertical"
     if y_label is not None:
@@ -449,7 +454,8 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     # Add a new figure that uses the range_tool to control the figure p
     select = figure(plot_height=45, plot_width=p.plot_width, y_range=p.y_range,
                     x_axis_type="datetime", y_axis_type=None, tools="",
-                    toolbar_location=None, background_fill_color="#efefef")
+                    toolbar_location=None, background_fill_color="#efefef",
+                    sizing_mode=kwargs.get('sizing_mode', None))
 
     range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
     range_tool.overlay.fill_color = palette[0]
@@ -609,6 +615,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     import skopt.plots
     import pickle
     import matplotlib as mpl
+    import matplotlib.pyplot as plt  # Plotting library
 
     mpl.rcParams['font.size'] = 5  # Matplotlib setup: For evaluation plots
 
