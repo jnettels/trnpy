@@ -528,7 +528,7 @@ class DCK_processor(object):
         self.copy_assigned_files(dck_list)
         return dck_list
 
-    def parametric_table_read(self, param_table_file):
+    def parametric_table_read(self, param_table_file, **kwargs):
         '''Reads a parametric table from a given file and return it as a
         DataFrame. Uses ``read_filetypes()`` to read the file.
 
@@ -538,7 +538,7 @@ class DCK_processor(object):
         Returns:
             parametric_table (DataFrame): Pandas DataFrame
         '''
-        parametric_table = self.read_filetypes(param_table_file)
+        parametric_table = self.read_filetypes(param_table_file, **kwargs)
 
         logger.info(param_table_file+':')
         if logger.isEnabledFor(logging.INFO):
