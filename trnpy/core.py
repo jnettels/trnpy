@@ -647,8 +647,20 @@ class DCK_processor(object):
             # Store the replacements found in the deck object
             for col in parametric_table.columns:
                 dck.replace_dict[col] = parametric_table.loc[hash_][col]
-            # Convert the replacements into regular expressions
-            self.add_replacements_value_of_key(dck.replace_dict, dck)
+
+            # Some replacements are performed directly, others have
+            # to be prepared (the type called "value of key")
+            for key, value in dck.replace_dict.items():
+                if 'ASSIGN' in key:
+                    # Use the replacement strings unchanged
+                    self.add_replacements({key: value}, dck)
+                else:
+                    if key[0] == '!':  # First letter is '!'
+                        continue  # Skip this key, it marks a comment
+
+                    # Convert the replacements into regular expressions
+                    self.add_replacements_value_of_key({key: value}, dck)
+
             # Done. Add the deck to the list.
             dck_list.append(dck)
         return dck_list
