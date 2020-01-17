@@ -167,6 +167,10 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     ``plot_width``, etc.
     '''
 
+    # Filter out empty columns
+    stack_labels = [c for c in stack_labels if any(df_in[c] != 0)]
+    stack_labels_neg = [c for c in stack_labels_neg if any(df_in[c] != 0)]
+
     # Prepare Data
     df = df_in.reset_index()  # Remove index
 
@@ -243,6 +247,12 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
     stacked.
     '''
     from pandas.tseries.frequencies import to_offset
+
+    # Filter out empty columns (test for NaN and 0)
+    y_cols_line = [col for col in y_cols_line if any(df[col].notna())]
+    y_cols_stacked = [col for col in y_cols_stacked if any(df[col].notna())]
+    y_cols_line = [c for c in y_cols_line if any(df[c] != 0)]
+    y_cols_stacked = [c for c in y_cols_stacked if any(df[c] != 0)]
 
     fig_list = []  # List of Bokeh figure objects
 
@@ -422,6 +432,9 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     '''
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = list(df_in.columns)
+
+    # Filter out empty columns
+    y_cols = [col for col in y_cols if any(df_in[col].notna())]
 
     df = df_in.reset_index()  # Remove index
     source = ColumnDataSource(data=df[[x_col]+y_cols])  # Use required columns
