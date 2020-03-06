@@ -197,7 +197,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     r_pos = p.vbar_stack(stack_labels, x=x_sel, width=1, source=source,
                          color=palette[0:len(stack_labels)],
                          name=stack_labels,
-                         legend=[x+" " for x in stack_labels],
+                         legend_label=[x+" " for x in stack_labels],
                          line_width=0,  # Prevent outline for height of 0
                          )
     if len(stack_labels_neg) > 0:
@@ -206,13 +206,14 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
         palette_neg = []
     r_neg = p.vbar_stack(stack_labels_neg, x=x_sel, width=1, source=source,
                          color=palette_neg, name=stack_labels_neg,
-                         legend=[x+" " for x in stack_labels_neg],
+                         legend_label=[x+" " for x in stack_labels_neg],
                          line_width=0,  # Prevent outline for height of 0
                          )
     r_circ = []
     if sum_circle_size > 0:
-        r = p.circle(x_sel, 'sum', source=source, legend='Sum', name='sum',
-                     color=palette[len(stack_labels)+1], size=sum_circle_size)
+        r = p.circle(x_sel, 'sum', source=source, legend_label='Sum',
+                     name='sum', color=palette[len(stack_labels)+1],
+                     size=sum_circle_size)
         r_circ.append(r)
 
     # Create HoverTool
@@ -287,11 +288,11 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
 
         p = figure(title=str(hash_), **kwargs)
         for y_col, color in zip(y_cols_line, palette):
-            p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+            p.line(x_col, y_col, legend_label=y_col+' ', line_width=2,
                    source=source_line, color=color, name=y_col)
 
         for y_col, color in zip(y_cols_stacked, palette[len(y_cols_line):]):
-            p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+            p.line(x_col, y_col, legend_label=y_col+' ', line_width=2,
                    source=source_stacked, color=color, name=y_col)
 
         hover = HoverTool(tooltips='$name: @$name')
@@ -330,7 +331,7 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     r_list = []
     p = figure(**kwargs)
     for i, y_col in enumerate(y_cols):
-        r = p.circle(x_col, y_col, source=source, legend=y_col+' ',
+        r = p.circle(x_col, y_col, source=source, legend_label=y_col+' ',
                      color=palette[i], name=y_col, size=size)
         r_list.append(r)
     p.legend.click_policy = 'hide'
@@ -448,7 +449,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
                x_range=fig_x_range)
 
     for y_col, color in zip(y_cols, palette):
-        p.line(x_col, y_col, legend=y_col+' ', line_width=2,
+        p.line(x_col, y_col, legend_label=y_col+' ', line_width=2,
                source=source, color=color, name=y_col)
 
     hover = HoverTool(tooltips='$name: @$name')
