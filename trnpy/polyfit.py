@@ -377,8 +377,8 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         # Define the axis ranges and scaling
         ax_ranges = [x.min(), x.max(),
                      y.min(), y.max(),
-                     z.min(), z.max(),
-#                     0, round(z.max(), -len(str(int(z.max())))+1)
+                     # z.min(), z.max(),  # TODO choose this or next line
+                     0, round(z.max(), -len(str(int(z.max())))+1)
                      ]
         ax_scale = [2.0,
                     2*(ax_ranges[1]-ax_ranges[0])/(ax_ranges[3]-ax_ranges[2]),
@@ -393,10 +393,10 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         mfig = mlab.figure(bgcolor=(1, 1, 1),  # Make background white
                            size=(1800, 1200))
         mfig.scene.renderer.use_depth_peeling = 1  # For transparency
-#        mfig.scene.parallel_projection = True
-#        parallel_scale = 60  # For constant parallel_projection
-#        parallel_scale = 70  # For constant parallel_projection
-        parallel_scale = 120  # For constant parallel_projection
+        # mfig.scene.parallel_projection = True  # TODO define toggle
+        parallel_scale = 60  # For constant parallel_projection
+        # parallel_scale = 70  # For constant parallel_projection
+        # parallel_scale = 120  # For constant parallel_projection
 
         # Create and visualize the mesh (derived from irregular points)
         pts = mlab.points3d(x_conv, y_conv, z_conv, z_conv, colormap='plasma',
@@ -419,14 +419,17 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         axes.label_text_property.italic = False
         axes.title_text_property.bold = False
         axes.title_text_property.italic = False
-        axes.axes.label_format = '%.0f'
-#        axes.axes.label_format = '%.1f'
+        # axes.axes.label_format = '%.0f'  # TODO set toggle
+        axes.axes.label_format = '%.1f'
         axes.property.display_location = 'background'
         axes.axes.font_factor = 1.2  # font_size doesn't seem to work
-#        axes.axes.font_factor = 2.0  # font_size doesn't seem to work
-#        axes.axes.label_text_property.font_size = 4
-#        axes.label_text_property.font_family = 'times'
-#        axes.title_text_property.font_family = 'times'
+        # axes.axes.fly_mode = 'none'  # TODO testing
+        axes.axes.corner_offset = 0.08  # TODO setting to mess around with
+        axes.property.opacity = 0.0  # Make the original axis disappear
+        # axes.axes.font_factor = 2.0  # font_size doesn't seem to work
+        # axes.axes.label_text_property.font_size = 4
+        # axes.label_text_property.font_family = 'times'
+        # axes.title_text_property.font_family = 'times'
 
 #        camera_light0 = mfig.scene.light_manager.lights[0]
 #        camera_light0.elevation = 90
@@ -758,8 +761,8 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
         fig.colorbar(cntr, label='Fehler',
                      ax=ax,
                      format='%.2f',
-#                     fraction=0.046, pad=0.04,
-#                     cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
+                     # fraction=0.046, pad=0.04,
+                     # cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
                      )  # regular colorbar
 
     plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
