@@ -741,7 +741,7 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
         # Manualy draw colorbar on empty plot
         cax, _ = mpl.colorbar.make_axes(ax)
         norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
-        mpl.colorbar.ColorbarBase(cax, cmap="viridis_r", norm=norm,
+        mpl.colorbar.ColorbarBase(cax, cmap=plt.cm.viridis_r, norm=norm,
                                   label='Fehler',
                                   format='%.2f',
                                   ticks=np.linspace(0, 0.6, num=10),
