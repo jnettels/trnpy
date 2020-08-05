@@ -525,7 +525,7 @@ class DCK_processor(object):
                                                     dck_file_list)
 
         self.rewrite_dcks(dck_list)
-        self.copy_assigned_files(dck_list)
+        self.copy_assigned_files(dck_list, find_files=True)
         return dck_list
 
     def parametric_table_read(self, param_table_file, **kwargs):
@@ -1049,7 +1049,8 @@ class DCK_processor(object):
             else:
                 continue
             # Convert TIME column to float
-            df[t_col] = [float(string) for string in df[t_col]]
+            df[t_col] = df[t_col].astype('float64')
+            df['HOURS'] = df[t_col]  # Store the float hours
 
             # Determine frequency as float, string and TimeDelta
             freq_float = df[t_col][1] - df[t_col][0]
