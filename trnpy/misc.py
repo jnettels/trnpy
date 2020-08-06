@@ -398,7 +398,7 @@ def bokeh_time_lines(df, fig_link=None, index_level='hash', x_col='TIME',
 
         title = []
         for j, level in enumerate(df_plot.index.names):
-            if level == x_col:
+            if (level == x_col or level == 'TIME'):
                 continue
             label = df_plot.index.codes[j][0]
             title += [level+'='+str(df_plot.index.levels[j][label])]
