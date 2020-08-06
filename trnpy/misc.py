@@ -247,7 +247,8 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
 
 def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
                             y_cols_line=[], y_cols_stacked=[],
-                            palette=palette_default, **kwargs):
+                            palette=palette_default, export_file=False,
+                            **kwargs):
     '''Create sorted annual load curve. The lines can be plotted as is, or
     stacked.
     '''
@@ -264,6 +265,8 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
     y_cols_stacked = [c for c in y_cols_stacked if any(df[c] != 0)]
 
     fig_list = []  # List of Bokeh figure objects
+    df_sort_line_list = []
+    hash_list = []
 
     for hash_ in sorted(set(df.index.get_level_values(index_level))):
         df_plot = df.loc[(hash_, slice(None), slice(None)), :]  # use hash only
@@ -316,6 +319,13 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
             p.yaxis.axis_label = y_label
 
         fig_list.append(p)
+        df_sort_line_list.append(df_sorted_line)
+        hash_list.append(hash_)
+
+    if export_file:
+        df_to_excel(df=df_sort_line_list, path=export_file,
+                    sheet_names=hash_list)
+
 
     return fig_list
 
