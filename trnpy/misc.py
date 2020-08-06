@@ -466,8 +466,12 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     else:
         fig_x_range = fig_link.x_range
 
-    p = figure(**kwargs, x_axis_type='datetime',
-               x_range=fig_x_range)
+    if df[x_col].dtype == 'datetime64[ns]':
+        x_axis_type='datetime'
+    else:
+        x_axis_type='linear'
+
+    p = figure(**kwargs, x_axis_type=x_axis_type, x_range=fig_x_range)
 
     for y_col, color in zip(y_cols, palette):
         p.line(x_col, y_col, legend_label=y_col+' ', line_width=2,
@@ -488,7 +492,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
 
     # Add a new figure that uses the range_tool to control the figure p
     select = figure(plot_height=45, plot_width=p.plot_width, y_range=p.y_range,
-                    x_axis_type="datetime", y_axis_type=None, tools="",
+                    x_axis_type=x_axis_type, y_axis_type=None, tools="",
                     toolbar_location=None, background_fill_color="#efefef",
                     sizing_mode=kwargs.get('sizing_mode', None))
 
