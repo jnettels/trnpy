@@ -167,6 +167,10 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     ``plot_width``, etc.
     '''
 
+    # Filter out non-existing columns
+    stack_labels = [c for c in stack_labels if c in df_in.columns]
+    stack_labels_neg = [c for c in stack_labels_neg if c in df_in.columns]
+
     # Filter out empty columns
     stack_labels = [c for c in stack_labels if any(df_in[c] != 0)]
     stack_labels_neg = [c for c in stack_labels_neg if any(df_in[c] != 0)]
@@ -235,7 +239,7 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     p.legend.background_fill_alpha = 0.5
     p.legend.location = "top_left"
     p.legend.click_policy = "hide"
-#    p.toolbar.autohide = True  # TODO Seems bugged
+    # p.toolbar.autohide = True  # TODO Seems bugged
     if y_label is not None:
         p.yaxis.axis_label = y_label
     return p
@@ -248,6 +252,10 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
     stacked.
     '''
     from pandas.tseries.frequencies import to_offset
+
+    # Filter out non-existing columns
+    y_cols_line = [col for col in y_cols_line if col in df.columns]
+    y_cols_stacked = [col for col in y_cols_stacked if col in df.columns]
 
     # Filter out empty columns (test for NaN and 0)
     y_cols_line = [col for col in y_cols_line if any(df[col].notna())]
@@ -302,7 +310,7 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
         p.legend.label_text_font_size = '8pt'
         p.legend.spacing = 1
         p.legend.padding = 5
-#        p.toolbar.autohide = True  # TODO Seems bugged
+        # p.toolbar.autohide = True  # TODO Seems bugged
 
         if y_label is not None:
             p.yaxis.axis_label = y_label
@@ -433,6 +441,9 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     '''
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = list(df_in.columns)
+
+    # Filter out non-existing columns
+    y_cols = [col for col in y_cols if col in df_in.columns]
 
     # Filter out empty columns
     y_cols = [col for col in y_cols if any(df_in[col].notna())]
