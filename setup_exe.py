@@ -1,15 +1,42 @@
-# -*- coding: utf-8 -*-
-'''
+# Copyright (C) 2019 Joris Nettelstroth
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see https://www.gnu.org/licenses/.
+
+"""TRNpy: Parallelized TRNSYS simulation with Python.
+
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
+Simulate TRNSYS deck files in serial or parallel and use parametric tables to
+perform simulations for different sets of parameters. TRNpy helps to automate
+these and similar operations by providing functions to manipulate deck files
+and run TRNSYS simulations from a programmatic level.
 
-**Setup script for the TRNpy project**
+Module Setup
+------------
+This module defines the setup script for the TRNpy project.
 
 Run with the following command prompt to create a Windows executable:
 
 .. code::
 
     python setup_exe.py build
+
+To create a standalone installer:
+
+.. code::
+
+    python setup_exe.py bdist_msi
 
 Lots of modules are excluded from the build and some unnecessary folders are
 removed from the resulting folder. This can cause the program to fail, but
@@ -31,7 +58,7 @@ also dramatically decreases the folder size.
     * mkl_def.dll
     * mkl_intel_thread.dll
 
-'''
+"""
 
 from setuptools_scm import get_version
 from cx_Freeze import setup, Executable
@@ -67,6 +94,37 @@ os.environ['TCL_LIBRARY'] = os.path.join(sys.exec_prefix, r'tcl\tcl8.6')
 os.environ['TK_LIBRARY'] = os.path.join(sys.exec_prefix, r'tcl\tk8.6')
 mkl_dlls = os.path.join(sys.exec_prefix, r'Library\bin')
 
+
+# http://msdn.microsoft.com/en-us/library/windows/desktop/aa371847(v=vs.85).aspx
+shortcut_table = [
+    ("DesktopShortcut",        # Shortcut
+     "DesktopFolder",          # Directory_
+     "TRNpy",                  # Name
+     "TARGETDIR",              # Component_
+     "[TARGETDIR]TRNpy.exe",   # Target
+     None,                     # Arguments
+     'Parallelized TRNSYS simulation with Python',  # Description
+     None,                     # Hotkey
+     None,                     # Icon
+     None,                     # IconIndex
+     None,                     # ShowCmd
+     'TARGETDIR'               # WkDir
+     ),
+    ("ProgramMenuShortcut",    # Shortcut
+     "ProgramMenuFolder",      # Directory_
+     "TRNpy",                  # Name
+     "TARGETDIR",              # Component_
+     "[TARGETDIR]TRNpy.exe",   # Target
+     None,                     # Arguments
+     'Parallelized TRNSYS simulation with Python',  # Description
+     None,                     # Hotkey
+     None,                     # Icon
+     None,                     # IconIndex
+     None,                     # ShowCmd
+     'TARGETDIR'               # WkDir
+     ),
+     ]
+
 # The setup function
 setup(
     name='trnpy',
@@ -74,15 +132,22 @@ setup(
     description='Parallelized TRNSYS simulation with Python',
     long_description=open('README.md').read(),
     license='GPL-3.0',
-    author='Joris Nettelstroth',
-    author_email='joris.nettelstroth@stw.de',
+    author='Joris Zimmermann',
+    author_email='joris.zimmermann@stw.de',
     url='https://github.com/jnettels/trnpy',
 
     # Options for building the Windows .exe
-    executables=[Executable(r'trnpy/trnpy_script.py', base=None,
-                            icon=r'res/icon.ico')],
+    executables=[Executable(r'trnpy/trnpy_script.py',
+                            base=None,  # None for cmd-line
+                            icon=r'./res/icon.ico',
+                            targetName='trnpy.exe',
+                            shortcutName="TRNpy",
+                            shortcutDir="ProgramMenuFolder",
+                            )],
     options={'build_exe': {'packages': ['numpy', 'asyncio'],
-                           'includes': [],
+                           'zip_include_packages': ["*"],  # reduze file size
+                           'zip_exclude_packages': [],
+                           'includes': ['pandas._libs.tslibs.base'],
                            'excludes': ['adodbapi',
                                         'alabaster'
                                         'asn1crypto',
@@ -119,6 +184,7 @@ setup(
                                         'lxml',
                                         'markupsafe',
                                         'matplotlib',
+                                        'matplotlib.tests',
                                         'msgpack',
                                         'nbconvert',
                                         'nbformat',
@@ -126,6 +192,7 @@ setup(
                                         'nose',
                                         'notebook',
                                         'numexpr',
+                                        'numpy.random._examples',
                                         'openpyxl',
                                         'OpenSSL',
                                         'PIL',
@@ -159,8 +226,14 @@ setup(
                                os.path.join(mkl_dlls, 'mkl_core.dll'),
                                os.path.join(mkl_dlls, 'mkl_def.dll'),
                                os.path.join(mkl_dlls, 'mkl_intel_thread.dll'),
+                               r'./res/icon.png',
                                ]
-                           }},
+                           },
+             'bdist_msi': {'data': {"Shortcut": shortcut_table},
+                           'upgrade_code':
+                               '{0f4794c7-5129-4414-8fd5-b8fff2816e45}',
+                           },
+             },
 )
 
 # Remove some more specific folders:
