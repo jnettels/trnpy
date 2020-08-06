@@ -114,7 +114,7 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
         writer = pd.ExcelWriter(path)
         for i, df_ in enumerate(df):
             try:  # Use given sheet name, or just an enumeration
-                sheet = sheet_names[i]
+                sheet = str(sheet_names[i])
             except IndexError:
                 sheet = str(i)
             # Add current sheet to the ExcelWriter by calling this
