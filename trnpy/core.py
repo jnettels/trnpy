@@ -1,22 +1,19 @@
-# -*- coding: utf-8 -*-
-'''
-**TRNpy: Parallelized TRNSYS simulation with Python**
+# Copyright (C) 2020 Joris Zimmermann
 
-Copyright (C) 2019 Joris Nettelstroth
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see https://www.gnu.org/licenses/.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see https://www.gnu.org/licenses/.
-
+"""TRNpy: Parallelized TRNSYS simulation with Python.
 
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
@@ -31,7 +28,7 @@ This module defines the two classes ``DCK_processor()`` and ``TRNExe()``.
 The first can create ``dck`` objects from regular TRNSYS
 input (deck) files and manipulate them, the latter can run simulations with
 the given ``dck`` objects.
-'''
+"""
 
 import logging
 import re
@@ -52,14 +49,15 @@ logger = logging.getLogger(__name__)
 
 
 class TRNExe(object):
-    '''The TRNExe class.
+    """Define the TRNExe class.
+
     The most prominent function a user will need is ``run_TRNSYS_dck_list()``,
     in order to perform the actual TRNSYS simulations with a list of ``dck``
     objects. All other functions are only used internally by that function.
 
     The behaviour of the TRNExe object (run in parallel, run hidden, number
     of CPU cores used) is controlled by the options given at initialization.
-    '''
+    """
 
     def __init__(self,
                  path_TRNExe=r'C:\Trnsys17\Exe\TRNExe.exe',
@@ -69,7 +67,8 @@ class TRNExe(object):
                  check_vital_sign=True,
                  pause_after_error=False,
                  ):
-        '''
+        """Initialize the object.
+
         The optional argument n_cores allows control over the used CPU cores.
         By default, the total number of CPU cores minus one are used. This way
         your CPU is not under 100% load - and using all cores does not
@@ -91,7 +90,7 @@ class TRNExe(object):
 
         Returns:
             None
-        '''
+        """
         self.path_TRNExe = path_TRNExe
         self.mode_trnsys_hidden = mode_trnsys_hidden
         self.mode_exec_parallel = mode_exec_parallel
@@ -100,12 +99,12 @@ class TRNExe(object):
         self.pause_after_error = pause_after_error
 
     def run_TRNSYS_dck(self, dck):
-        '''Run a TRNSYS simulation with the given deck dck_file.
+        """Run a TRNSYS simulation with the given deck dck_file.
 
         A couple of seconds random delay are added before calling the TRNSYS
         executable. This may prevent ``I/O Error`` messages from TRNSYS
         that were sometimes occurring.
-        '''
+        """
         import random
 
         if not os.path.exists(self.path_TRNExe):
@@ -155,7 +154,8 @@ class TRNExe(object):
         return dck
 
     def check_log_for_errors(self, dck):
-        '''Stores errors in error_msg_list. Returns False if errors are found.
+        """Store errors in error_msg_list. Return False if errors are found.
+
         Function tries to open the log file of the given simulation and
         searches for error messages with a regular expression.
 
@@ -164,7 +164,7 @@ class TRNExe(object):
 
         Returns:
             True/False (bool): Did simulation finish successfully?
-        '''
+        """
         logfile_path = os.path.splitext(dck.file_path_dest)[0] + '.log'
         try:
             with open(logfile_path, 'r') as f:
@@ -183,7 +183,8 @@ class TRNExe(object):
             return True
 
     def TRNExe_is_alive(self, pid, interval_1=0.3, interval_2=9.7):
-        '''Check whether or not a particular TRNExe.exe process is alive.
+        """Check whether or not a particular TRNExe.exe process is alive.
+
         This status is guessed by measuring its CPU load over the given time
         intervals. The first measurement has to be short, because it blocks
         the thread. If it indicates a low CPU load, the second (longer)
@@ -198,7 +199,7 @@ class TRNExe(object):
 
         Returns:
             True/False (bool): Status information
-        '''
+        """
         if self.check_vital_sign is False:
             return True  # Skip the check if the user demands it
 
@@ -216,7 +217,8 @@ class TRNExe(object):
         return True
 
     def run_TRNSYS_dck_list(self, dck_list):
-        '''Run one TRNSYS simulation of each deck file in the dck_list.
+        """Run one TRNSYS simulation of each deck file in the dck_list.
+
         This is a wrapper around run_TRNSYS_dck() that allows execution in
         serial and in parallel.
 
@@ -225,7 +227,7 @@ class TRNExe(object):
 
         Returns:
             returned_dck_list (list): List of DCK objects worked on
-        '''
+        """
         if len(dck_list) == 0:
             raise ValueError('The list of decks "dck_list" must not be empty.')
 
@@ -247,10 +249,10 @@ class TRNExe(object):
                         ' jobs on ' + str(n_cores) + ' cores')
             pool = multiprocessing.Pool(n_cores)
 
-            '''For short lists, imap seemed the fastest option.
-            With imap, the result is a consumable iterator'''
-#            map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
-            '''With map_async, the results are available immediately'''
+            """For short lists, imap seemed the fastest option.
+            With imap, the result is a consumable iterator"""
+            # map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
+            """With map_async, the results are available immediately"""
             map_result = pool.map_async(self.run_TRNSYS_dck, dck_list)
 
             pool.close()  # No more processes can be launched
@@ -259,8 +261,8 @@ class TRNExe(object):
 
             returned_dck_list = map_result.get()
             # With imap, the iterator must be turned into a list:
-#            returned_dck_list = list(map_result)
-#            print(returned_dck_list)
+            # returned_dck_list = list(map_result)
+            # print(returned_dck_list)
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
         script_time = str(script_time).split('.')[0]
@@ -269,8 +271,9 @@ class TRNExe(object):
         return returned_dck_list
 
     def print_progress(self, map_result, start_time):
-        '''Prints info about the multiprocessing progress to the screen.
-        Measures and prints the percentage of simulations done and an
+        """Print info about the multiprocessing progress to the screen.
+
+        Measure and print the percentage of simulations done and an
         estimation of the remaining time.
         The parameter 'map_result' must be the return of a pool.map_async()
         function. Please be aware that this mapping splits the work list into
@@ -285,7 +288,7 @@ class TRNExe(object):
 
         Returns:
             None
-        '''
+        """
         total = map_result._number_left
         remaining_last = total
         while map_result.ready() is False:  # Repeat this until finished
@@ -323,13 +326,15 @@ class TRNExe(object):
 
 
 class DCK(object):
-    '''Deck class.
+    """Define the deck class.
+
     Holds all the information about a deck file, including the content of the
     file itself. This allows manipulating the content, before saving the
     actual file to the old or a new location for simulation.
     These locations are stored, as well as the applied manipulations.
     After a simulation, potential errors can be stored in the object, too.
-    '''
+    """
+
     def __init__(self, file_path, regex_result_files=regex_result_files_def):
         self.file_path_orig = file_path
         self.file_path_dest = file_path
@@ -348,8 +353,7 @@ class DCK(object):
         self.find_assigned_files()
 
     def load_dck_text(self):
-        '''Here we store the complete text of the deck file as a property of
-        the deck object.
+        """Store the complete deck file text as a property of the deck object.
 
         .. note::
             This may or may not prove to consume too much memory.
@@ -359,7 +363,7 @@ class DCK(object):
 
         Returns:
             None
-        '''
+        """
         if os.path.splitext(self.file_path_orig)[1] != '.dck':
             msg = self.file_path_orig+' has the wrong file type, must be .dck'
             raise ValueError(msg)
@@ -370,8 +374,9 @@ class DCK(object):
                 self.dck_text = f.read()
 
     def find_assigned_files(self):
-        '''Find all file paths that appear after an "ASSIGN" key in the
-        deck. The files are sorted into input and output (=result) files by
+        """Find all file paths that appear after an "ASSIGN" key in the deck.
+
+        The files are sorted into input and output (=result) files by
         applying regex_result_files.
         The results are stored in the lists assigned_files and result_files.
 
@@ -380,7 +385,7 @@ class DCK(object):
 
         Returns:
             None
-        '''
+        """
         self.assigned_files = []
         self.result_files = []
         self.assigned_files = re.findall(r'ASSIGN \"(.*)\"', self.dck_text)
@@ -406,8 +411,9 @@ class DCK(object):
                              'name in the assigned file ' + file)
 
     def find_equations(self, iteration=5):
-        '''Find equations with key and value (separated by '=') in the text
-        of the deck file. Fill and return a dictionary with the results.
+        """Find equations with key and value in the text of the deck file.
+
+        Fill and return a dictionary with the results.
         This allows easy access to all properties of the simulation.
         The function tries to solve simple equations and turn the values
         into floats.
@@ -417,7 +423,7 @@ class DCK(object):
 
         Returns:
             dck_equations (dict): Key, value pairs of equations in dck_text
-        '''
+        """
         if iteration >= 5:  # Only find equations in the first iteration
             re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
 
@@ -462,7 +468,8 @@ class DCK(object):
 
 
 class DCK_processor(object):
-    '''Deck processor class.
+    """Define the deck processor class.
+
     Create ``dck`` objects from regular TRNSYS input (deck) files and
     manipulate them. An example workflow could be:
         * For parameter variations:
@@ -492,14 +499,17 @@ class DCK_processor(object):
     create a proper Pandas multiindex from the results of parametric runs,
     slice to select specific time intervals and / or resample the data to
     new frequencies, e.g. from hours to months.
-    '''
+    """
+
     def __init__(self, sim_folder=r'C:\Trnsys17\Work\batch',
                  regex_result_files=regex_result_files_def):
         self.sim_folder = sim_folder
         self.regex_result_files = regex_result_files
 
     def parametric_table_auto(self, parametric_table, dck_file_list):
-        '''Convenient automated parametric table function.
+        """Automate the creation deck objects from a parametric table.
+
+        Conveniently wrap the steps in the most common use case.
         A parametric table was given. Therefore we do the standard procedure
         of creating a ``dck`` object list from the parameters. We add those
         lists for all given files.
@@ -511,7 +521,7 @@ class DCK_processor(object):
 
         Returns:
             dck_list (list): List of dck objects
-        '''
+        """
         from collections.abc import Sequence
 
         dck_list = []
@@ -529,15 +539,16 @@ class DCK_processor(object):
         return dck_list
 
     def parametric_table_read(self, param_table_file, **kwargs):
-        '''Reads a parametric table from a given file and return it as a
-        DataFrame. Uses ``read_filetypes()`` to read the file.
+        """Read. a parametric table from a given file.
+
+        Return it as a DataFrame. Uses ``read_filetypes()`` to read the file.
 
         Args:
             param_table_file (str): Path to a file
 
         Returns:
             parametric_table (DataFrame): Pandas DataFrame
-        '''
+        """
         parametric_table = self.read_filetypes(param_table_file, **kwargs)
 
         logger.info(param_table_file+':')
@@ -547,15 +558,16 @@ class DCK_processor(object):
         return parametric_table
 
     def parametric_table_combine(self, parameters):
-        '''Produces a parametric table from all combinations of individual
-        values of the given parameters.
+        """Produce a parametric table from value combinations.
+
+        Use all combinations of individual values of the given parameters.
 
         Args:
             parameters (dict): Dictionary with parameters and their values
 
         Returns:
             parametric_table (DataFrame): Pandas DataFrame
-        '''
+        """
         flat = [[(k, v) for v in vs] for k, vs in parameters.items()]
         combis = [dict(items) for items in itertools.product(*flat)]
         parametric_table = pd.DataFrame.from_dict(combis)
@@ -567,15 +579,16 @@ class DCK_processor(object):
         return parametric_table
 
     def read_filetypes(self, filepath, **kwargs):
-        '''Read any file type with stored data and return the Pandas DataFrame.
-        Wrapper around Pandas' read_excel() and read_csv().
+        """Read any file type with stored data and return the Pandas DataFrame.
+
+        This is a wrapper around Pandas' read_excel() and read_csv().
 
         Please note: With 'kwargs', you can pass any (named) parameter down
         to the Pandas functions. The TRNSYS printer adds some useless rows
         at the top and bottom of the file? No problem, just define 'skiprows'
         and 'skipfooter'. For all options, see:
         http://pandas.pydata.org/pandas-docs/stable/generated/pandas.read_csv.html
-        '''
+        """
         filetype = os.path.splitext(os.path.basename(filepath))[1]
         if filetype in ['.xlsx', '.xls']:
             # Excel can be read automatically
@@ -604,10 +617,10 @@ class DCK_processor(object):
         return df
 
     def get_parametric_dck_list(self, parametric_table, dck_file):
-        '''Create a list of deck objects from  a ``parametric_table`` and
-        one path to a deck file. For each row in the table, one deck object
-        is created and parameters and their values in that row are prepared
-        for replacement.
+        """Create list of deck objects from ``parametric_table`` and dck_file.
+
+        For each row in the parametric table, one deck object is created and
+        parameters and their values in that row are prepared for replacement.
 
         After this function call, you will most likely also have to call:
 
@@ -626,7 +639,7 @@ class DCK_processor(object):
 
         Returns:
             dck_list (list): List of ``dck`` objects
-        '''
+        """
         if isinstance(parametric_table, str):
             # Default is to hand over a parametric_table DataFrame. For
             # convenience, a file path is accepted and read into a DataFrame
@@ -666,7 +679,8 @@ class DCK_processor(object):
         return dck_list
 
     def add_replacements(self, replace_dict_new, dck):
-        '''Add new entries to the existing replace_dict of a dck object.
+        """Add new entries to the existing replace_dict of a dck object.
+
         Basic use is to add strings, but also accepts regular expressions.
         These allow you to replace any kind of information.
 
@@ -681,7 +695,7 @@ class DCK_processor(object):
 
         Returns:
             None
-        '''
+        """
         from collections.abc import Sequence
 
         if isinstance(dck, Sequence) and not isinstance(dck, str):
@@ -692,7 +706,8 @@ class DCK_processor(object):
                 dck.regex_dict[re_find] = re_replace
 
     def add_replacements_value_of_key(self, replace_dict_new, dck):
-        '''Add new entries to the existing replace_dict of a dck object.
+        """Add new entries to the existing replace_dict of a dck object.
+
         Creates the required regular expression to replace the 'value' of the
         'key' in the deck file. Then calls add_replacements().
 
@@ -713,7 +728,7 @@ class DCK_processor(object):
 
                 replace_dict_new = {'A_Koll': 550,
                                     'plot_on_off': -1}
-        '''
+        """
         for key, value in replace_dict_new.items():
             # Find key and previous value, possibly separated by '='
             re_find = r'(?P<key>\b'+key+r'\s?=\s?)(?P<value>.*)'
@@ -722,23 +737,26 @@ class DCK_processor(object):
             self.add_replacements({re_find: re_replace}, dck)
 
     def disable_plotters(self, dck):
-        '''Disable the plotters by setting their parameter 9 to '-1'.
+        """Disable the plotters by setting their parameter 9 to '-1'.
+
         Calls add_replacements() with the required regular expressions.
-        '''
+        """
         re_find = r'\S+(?P<old_text>\s*! 9 Shut off Online )'
         re_replace = r''+str(-1)+r'\g<old_text>'
         self.add_replacements({re_find: re_replace}, dck)
 
     def reset_replacements(self, dck):
-        '''Reset all previous replacements by making ``replace_dict`` and
-        ``regex_dict`` empty.
-        '''
+        """Reset all previous replacements.
+
+        This is done by making ``replace_dict`` and ``regex_dict`` empty.
+        """
         dck.replace_dict = dict()
         dck.regex_dict = dict()
 
     def create_dcks_from_file_list(self, dck_file_list, update_dest=False,
                                    copy_files=False):
-        '''Takes a list of file paths and creates deck objects for each one.
+        """Take a list of file paths and creates deck objects for each one.
+
         If the optional argument ``update_dest`` is True, the destination path
         becomes a folder with the name of the file, inside the ``sim_folder``
         (which is a property of the ``dck_processor`` object).
@@ -769,7 +787,7 @@ class DCK_processor(object):
         Returns:
             dck_list (list): List of ``dck`` objects
 
-        '''
+        """
         dck_list = [DCK(dck_file, regex_result_files=self.regex_result_files)
                     for dck_file in dck_file_list]
         if update_dest:
@@ -785,7 +803,8 @@ class DCK_processor(object):
         return dck_list
 
     def rewrite_dcks(self, dck_list, print_warnings=True):
-        '''Perform the replacements in ``self.replace_dict`` in the deck files.
+        """Perform the replacements in ``self.replace_dict`` in the deck files.
+
         You have to use add_replacements(), add_replacements_value_of_key()
         or disable_plotters() before, to fill the replace_dict.
 
@@ -797,7 +816,7 @@ class DCK_processor(object):
 
         Returns:
             dck_list (list): List of ``dck`` objects, now manipulated
-        '''
+        """
         # Process the deck file(s)
         for dck in dck_list:
             # Perform the replacements:
@@ -812,7 +831,9 @@ class DCK_processor(object):
         return
 
     def copy_assigned_files(self, dck_list, find_files=False):
-        '''All external files that a TRNSYS deck depends on are stored with
+        """Copy all assigned files from the source to the simulation folder.
+
+        All external files that a TRNSYS deck depends on are stored with
         the ASSIGN parameter. We make a list of those files and copy them
         to the required location. (Weather data, load profiles, etc.)
 
@@ -824,7 +845,7 @@ class DCK_processor(object):
 
         Returns:
             None
-        '''
+        """
         for dck in dck_list:
             if find_files:  # update 'dck.assigned_files'
                 dck.find_assigned_files()  # search deck text for file paths
@@ -834,8 +855,8 @@ class DCK_processor(object):
             for file in dck.assigned_files:
                 source_file = os.path.join(source_folder, file)
                 destination_file = os.path.join(destination_folder, file)
-#                logger.debug('source      = '+source_file)
-#                logger.debug('destination = '+destination_file)
+                # logger.debug('source      = '+source_file)
+                # logger.debug('destination = '+destination_file)
                 if not os.path.exists(os.path.dirname(destination_file)):
                     os.makedirs(os.path.dirname(destination_file))
 
@@ -879,8 +900,7 @@ class DCK_processor(object):
         return
 
     def report_errors(self, dck_list, warn=False):
-        '''Print all the errors stored in the ``dck`` objects of the given
-        dck_list.
+        """Print all the errors stored in the ``dck`` objects of the dck_list.
 
         Args:
             dck_list (list): List of ``dck`` objects
@@ -889,7 +909,7 @@ class DCK_processor(object):
 
         Returns:
             error_found (bool): True, if an error was found
-        '''
+        """
         error_found = False
         for dck in dck_list:
             if dck.success is False:
@@ -906,8 +926,9 @@ class DCK_processor(object):
 
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None):
-        '''Collect the results of the simulations. Our goal is to combine
-        the result files of the parametric runs into DataFrames. The DataFrames
+        """Collect the results of the simulations.
+
+        Combine the result files of the parametric runs into DataFrames. They
         contain the raw data plus columns for each of the replacements made
         in the deck files. This allows you to identify each parametric run.
 
@@ -946,7 +967,7 @@ class DCK_processor(object):
 
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
-        '''
+        """
         result_data = dict()
         for i, dck in enumerate(dck_list, start=1):
             for result_file in dck.result_files:
@@ -996,7 +1017,8 @@ class DCK_processor(object):
         return result_data
 
     def results_create_index(self, result_data, replace_dict={}, origin=None):
-        '''Put the time and parameter columns into the index of the DataFrame.
+        """Put the time and parameter columns into the index of the DataFrame.
+
         The function expects the return of ``results_collect()``. This
         typically creates a multi-index and is arguably how DataFrames are
         supposed to be handled.
@@ -1031,7 +1053,7 @@ class DCK_processor(object):
 
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
-        '''
+        """
         import datetime
 
         if origin is None:  # Create default datetime object
@@ -1140,10 +1162,11 @@ class DCK_processor(object):
         return result_data
 
     def results_slice_time(self, df, start, end):
-        '''Slice the time index from ``"start"`` to ``"end"``, while keeping
-        the other index columns intact. Expects the time column to be at last
-        position in the multi-index. Date/time strings can be formatted e.g.
-        ``"2018-01-01"`` or ``"2018-01-15 08:00"``.
+        """Slice the time index from ``"start"`` to ``"end"``.
+
+        Keep the other index columns intact. Expects the time column to be at
+        last position in the multi-index. Date/time strings can be formatted
+        e.g. ``"2018-01-01"`` or ``"2018-01-15 08:00"``.
 
         Args:
             df (DataFrame): Pandas DataFrame to slice
@@ -1154,7 +1177,7 @@ class DCK_processor(object):
 
         Returns:
             df_new (DataFrame): Sliced DataFrame
-        '''
+        """
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
         n_index_cols = len(df.index.names)  # Number of index columns
@@ -1176,7 +1199,8 @@ class DCK_processor(object):
 
     def results_resample(self, df, freq, regex_sum=r'^Q_|^E_',
                          regex_mean=r'^T_|^M_', prio='sum', **kwargs):
-        '''Resample a multi-indexed DataFrame to a new frequency.
+        """Resample a multi-indexed DataFrame to a new frequency.
+
         Expects the time column to be at last position in the multi-index.
         Columns not matched by the regular expressions will be dropped with
         an info message.
@@ -1209,7 +1233,7 @@ class DCK_processor(object):
 
         Returns:
             df_new (DataFrame): Resampled DataFrame
-        '''
+        """
         # Apply the regular expressions to get two lists of columns
         cols_sum = []
         cols_mean = []

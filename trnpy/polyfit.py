@@ -1,22 +1,19 @@
-# -*- coding: utf-8 -*-
-'''
-**TRNpy: Parallelized TRNSYS simulation with Python**
+# Copyright (C) 2019 Joris Nettelstroth
 
-Copyright (C) 2019 Joris Nettelstroth
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see https://www.gnu.org/licenses/.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see https://www.gnu.org/licenses/.
-
+"""TRNpy: Parallelized TRNSYS simulation with Python.
 
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
@@ -33,7 +30,7 @@ to create fitted polynoms of from data in 2 or 3-dimensional space.
 
 These functions are quite experimental and adapted to specific tasks.
 
-'''
+"""
 import numpy as np
 import pandas as pd
 import os
@@ -46,8 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 def make_bokeh_colorbar(df, x, y, z, file=None):
-    '''Bokeh plot with colorbar.
-    '''
+    """Make a Bokeh plot with colorbar."""
     from bokeh.models import (ColumnDataSource, LinearColorMapper, BasicTicker,
                               ColorBar, HoverTool)
     from bokeh.plotting import figure, output_file, show
@@ -85,8 +81,9 @@ def make_bokeh_colorbar(df, x, y, z, file=None):
 
 
 def polyfit2d(x, y, f, order):
-    '''Fit given data to a 2-D polynomial of given order. Return array of
-    coefficients ``c`` as expected as input by numpy's polyval2d.
+    r"""Fit given data to a 2-D polynomial of given order.
+
+    Return array of coefficients ``c`` as expected as input by numpy polyval2d.
 
     .. math:: p(x,y) = \\sum_{i,j} c_{i,j} * x^i * y^j
 
@@ -95,7 +92,7 @@ def polyfit2d(x, y, f, order):
 
     Numpy polyval2d:
     https://docs.scipy.org/doc/numpy/reference/generated/numpy.polynomial.polynomial.polyval2d.html
-    '''
+    """
     import numpy as np
 
     x = np.asarray(x)
@@ -110,7 +107,7 @@ def polyfit2d(x, y, f, order):
 
 
 def poly_fit_and_plot(x, y, z=None, **kwargs):
-
+    """Fit 2-D or 1-D polynomials, depending on the input."""
     if z is None:
         func = poly1d_fit_and_plot(x=x, y=y, **kwargs)
 
@@ -121,11 +118,11 @@ def poly_fit_and_plot(x, y, z=None, **kwargs):
 
 
 def custom_axis_format(ax):
-    '''special style format:
+    """Format the axis in a special style.
 
-        * space as thousands separator
-        * rotation
-    '''
+    * space as thousands separator
+    * rotation
+    """
     import locale
     locale.setlocale(locale.LC_ALL, '')  # Use space as thousands separator
     ax.get_xaxis().set_major_formatter(  # Use space as thousands separator
@@ -147,8 +144,10 @@ def poly1d_fit_and_plot(
                           transparent=True),
         contour_lines=False, color_scatter='red',
         ):
-    r'''Fit given data to a 1-D polynomial of given order. Plot input data
-    and fittet data. Return a function representing the following equation:
+    r"""Fit given data to a 1-D polynomial of given order.
+
+    Plot input data and fittet data. Return a function representing the
+    following equation:
 
     .. math:: p(x) = \sum_{i} c_{i} \cdot x^i
 
@@ -156,7 +155,7 @@ def poly1d_fit_and_plot(
 
     .. math:: p(x) = a \cdot x^b + c
 
-    '''
+    """
     import numpy as np
     import matplotlib.pyplot as plt
     from scipy.optimize import curve_fit
@@ -182,8 +181,8 @@ def poly1d_fit_and_plot(
         if c_axis is not None:
             paths = ax.scatter(x, y, label=str(len(x))+' Lösungen',
                                c=c_axis, cmap='plasma')
-#            paths = ax.scatter(x[1:], y[1:], label=str(len(x)-1)+' Lösungen',
-#                               c=c_axis[1:], cmap='plasma')
+            # paths = ax.scatter(x[1:], y[1:], label=str(len(x)-1)+' Lösungen',
+            #                    c=c_axis[1:], cmap='plasma')
             fig.colorbar(  # regular colorbar
                     paths,
                     ax=ax,
@@ -274,9 +273,7 @@ def poly1d_fit_and_plot(
 
     def func(xi, check_confidence=True, filter_confidence=False,
              show_plot=False):
-        '''Return the results of the fitted polynom, calculated for the given
-        input.
-        '''
+        """Calculate the results of the fitted polynom for the given input."""
         result = poly(xi)
 
         fig = plt.figure(figsize=(5, 5))
@@ -323,8 +320,10 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                         savefig_args=dict(), render='mayavi',
                         save_transparent=False, nb_labels=6,
                         contour_plot_2d=False):
-    '''Fit given data to a 2-D polynomial of given order. Plot input data
-    and fittet data. Return a function representing the following equation:
+    r"""Fit given data to a 2-D polynomial of given order.
+
+    Plot input data and fittet data. Return a function representing the
+    following equation:
 
     .. math:: p(x,y) = \\sum_{i,j} c_{i,j} * x^i * y^j
 
@@ -332,14 +331,15 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     use, but does not visualize intersecting surface appropriately
     (one surface is always shown in front of the other). As an alternative
     render package MayaVi can be used.
-    '''
+    """
     import matplotlib.path as mplPath
     from mpl_toolkits.mplot3d import Axes3D  # for plot_trisurf
     from matplotlib import cm
     from mayavi import mlab
 
     def make_colormap(seq):
-        """Return a LinearSegmentedColormap
+        """Return a LinearSegmentedColormap.
+
         seq: a sequence of floats and RGB-tuples. The floats should be
         increasing and in the interval (0,1).
         """
@@ -404,8 +404,8 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         mesh = mlab.pipeline.delaunay2d(pts)
         surf1 = mlab.pipeline.surface(mesh, colormap='plasma')
         surf1.actor.property.opacity = 1
-#        surf1.actor.actor.scale = ax_scale
-#        surf1.actor.property.lighting = False
+        # surf1.actor.actor.scale = ax_scale
+        # surf1.actor.property.lighting = False
 
         # Create axis and outline (cube)
         grid_color = (.7, .7, .7)
@@ -431,10 +431,10 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         # axes.label_text_property.font_family = 'times'
         # axes.title_text_property.font_family = 'times'
 
-#        camera_light0 = mfig.scene.light_manager.lights[0]
-#        camera_light0.elevation = 90
-#        camera_light0.azimuth = 45
-#        camera_light0.intensity = 1.0
+        # camera_light0 = mfig.scene.light_manager.lights[0]
+        # camera_light0.elevation = 90
+        # camera_light0.azimuth = 45
+        # camera_light0.intensity = 1.0
 
         # Create axis grid
         x_ticks = np.linspace(ax_ranges[0], ax_ranges[1], nb_labels)
@@ -442,21 +442,28 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         z_ticks = np.linspace(ax_ranges[4], ax_ranges[5], nb_labels)
 
         tube_radius = 0.05
-#        tube_radius = 10.0
+        # tube_radius = 10.0
 
+        # This is an ugly workaround for manually creating a background grid
         for tick in x_ticks:
             _x = [tick*ax_scale[0], tick*ax_scale[0], tick*ax_scale[0]]
-            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1], y_ticks[0]*ax_scale[1]]
-            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2], z_ticks[-1]*ax_scale[2]]
+            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1],
+                  y_ticks[0]*ax_scale[1]]
+            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2],
+                  z_ticks[-1]*ax_scale[2]]
             mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
         for tick in y_ticks:
-            _x = [x_ticks[0]*ax_scale[0], x_ticks[-1]*ax_scale[0], x_ticks[-1]*ax_scale[0]]
+            _x = [x_ticks[0]*ax_scale[0], x_ticks[-1]*ax_scale[0],
+                  x_ticks[-1]*ax_scale[0]]
             _y = [tick*ax_scale[1], tick*ax_scale[1], tick*ax_scale[1]]
-            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2], z_ticks[-1]*ax_scale[2]]
+            _z = [z_ticks[0]*ax_scale[2], z_ticks[0]*ax_scale[2],
+                  z_ticks[-1]*ax_scale[2]]
             mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
         for tick in z_ticks:
-            _x = [x_ticks[-1]*ax_scale[0], x_ticks[-1]*ax_scale[0], x_ticks[0]*ax_scale[0]]
-            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1], y_ticks[0]*ax_scale[1]]
+            _x = [x_ticks[-1]*ax_scale[0], x_ticks[-1]*ax_scale[0],
+                  x_ticks[0]*ax_scale[0]]
+            _y = [y_ticks[-1]*ax_scale[1], y_ticks[0]*ax_scale[1],
+                  y_ticks[0]*ax_scale[1]]
             _z = [tick*ax_scale[2], tick*ax_scale[2], tick*ax_scale[2]]
             mlab.plot3d(_x, _y, _z, color=grid_color, tube_radius=tube_radius)
 
@@ -468,11 +475,11 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     if c_axis is not None:
         # Add a color bar which maps values to colors.
         fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-#        cbar = mlab.colorbar(object=surf1, orientation='vertical', nb_labels=6)
-#        cbar.label_text_property.color = (0.3, 0.3, 0.3)
-#        cbar.label_text_property.bold = False
-#        cbar.label_text_property.italic = False
-#        cbar.data_range = [0.0, round(z.max(), -len(str(int(z.max())))+1)]
+        # cbar = mlab.colorbar(surf1, orientation='vertical', nb_labels=6)
+        # cbar.label_text_property.color = (0.3, 0.3, 0.3)
+        # cbar.label_text_property.bold = False
+        # cbar.label_text_property.italic = False
+        # cbar.data_range = [0.0, round(z.max(), -len(str(int(z.max())))+1)]
 
     # Add annotations
     ax.text2D(0.01, 0.99, title, transform=ax.transAxes)
@@ -509,9 +516,9 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                                  colormap='viridis')
             mesh2 = mlab.pipeline.delaunay2d(pts2)
             surf2 = mlab.pipeline.surface(mesh2, colormap='viridis')
-#            surf2.actor.actor.scale = ax_scale
+            # surf2.actor.actor.scale = ax_scale
             surf2.actor.property.opacity = 0.75
-#            surf2.actor.property.lighting = False
+            # surf2.actor.property.lighting = False
 
         # Alternative: 2-D contour plot
         if contour_plot_2d:
@@ -531,7 +538,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     if savedir:
         # Set rotation angle to 30 degrees
         ax.view_init(azim=230)
-#        fig.savefig(os.path.join(savedir, savefile), **savefig_args)
+        # fig.savefig(os.path.join(savedir, savefile), **savefig_args)
 
         if render == 'mayavi':
             mlab.view(*mlab_view)  # Reset the view to previous settings
@@ -565,13 +572,12 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
 
     def func(xi, yi, check_confidence=False, show_plot=False,
              contains_radius=1, savefile=False, savefig_args=dict()):
-        '''Return the results of the fitted polynom, calculated for the given
-        input.
+        """Calculate the results of the fitted polynom for the given input.
 
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
 
         TODO: The hull vertices are not rendered as a closed line
-        '''
+        """
         import matplotlib.patches as patches
         from scipy.spatial import ConvexHull
 
@@ -586,7 +592,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                                  points[hull.vertices, 1]]).T
             bbPath = mplPath.Path(vertices)
 
-#            plt.figure()
+            # plt.figure()
             zlim_low = ax.get_zlim()[0]  # Show boundaries at bottom of z-axis
             ax.plot(points[hull.vertices, 0], points[hull.vertices, 1],
                     zlim_low, 'r--', lw=2)  # Plot boundaries as red line (3D)
@@ -605,7 +611,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                               points[hull.vertices, 0][0])*ax_scale[0],
                     np.append(points[hull.vertices, 1],
                               points[hull.vertices, 1][0])*ax_scale[1],
-#                    [zlim_low*ax_scale[2]]*(len(points[hull.vertices, 0])+1),
+                    # [zlim_low*ax_scale[2]]*(len(points[hull.vertices, 0])+1),
                     [0]*(len(points[hull.vertices, 0])+1),
                     tube_radius=0.33, opacity=0.5,
                     representation='surface', figure=mfig,
@@ -665,7 +671,7 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
 
 
 def make_nomograph(func, file):
-    '''Create nomograph with pynomo.
+    """Create nomograph with pynomo.
 
     Variant: x-axis: V_Sp, y-axis: A_PV, contour: WP_multi
 
@@ -675,7 +681,7 @@ def make_nomograph(func, file):
 
     - v_func is the function f(x,y) which returns z
     - v_func is the function f(wd,v) which returns u
-    '''
+    """
     import sys
     sys.path.insert(0, "..")
     from pynomo.nomographer import Nomographer
@@ -720,11 +726,9 @@ def make_nomograph(func, file):
 def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
                  plot_empty=False, contour_tricontour=False,
                  contour_lines=False, ):
-    '''Create matplotlib contour plots along with a colorbar next to the plot.
-    '''
-
+    """Create matplotlib contour plots along with a colorbar."""
     fig = plt.figure()
-#    fig = plt.figure(figsize=(5, 5))
+    # fig = plt.figure(figsize=(5, 5))
     ax = fig.gca()
     if limits_xy is not None:  # Set axis limits
         ax.axis(limits_xy)  # tuple of xmin, xmax, ymin, ymax
@@ -733,13 +737,13 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
     plt.xlabel(x_label)
     plt.ylabel(y_label)
 
-#    n_levels = np.linspace(0, 0.48, num=49)  # For colorbar
+    # n_levels = np.linspace(0, 0.48, num=49)  # For colorbar
     n_levels = np.linspace(0, 0.6, num=55)  # For colorbar
-#    n_levels = np.linspace(0, 0.6, num=11)  # For colorbar
+    # n_levels = np.linspace(0, 0.6, num=11)  # For colorbar
 
     if plot_empty:
         ax.plot(x, y, 'ko', ms=0, label='Simulationen')  # invisible dots
-#        ax.set_title('%d Simulationen' % len(x))
+        # ax.set_title('%d Simulationen' % len(x))
 
         # Manualy draw colorbar on empty plot
         cax, _ = mpl.colorbar.make_axes(ax)
@@ -775,9 +779,10 @@ def build_gif(df, x, y, savedir, x_label='', y_label='',
               savefig_args=dict(dpi=100, bbox_inches='tight', pad_inches=0.05,
                                 format='png'),
               ):
-    '''Create GIF animations from a DataFrame containing the "history" of an
-    optimization run
-    '''
+    """Create GIF animations.
+
+    Uses a DataFrame containing the "history" of an optimization run.
+    """
     import imageio
     import io
     import shutil
@@ -802,7 +807,7 @@ def build_gif(df, x, y, savedir, x_label='', y_label='',
                                    df.loc[:i, 'error'], x_label=x_label,
                                    y_label=y_label, z_label='Fehler',
                                    limits_xy=limits_xy)
-#            plt.show()
+            # plt.show()
             buffer = io.BytesIO()
             fig.savefig(buffer, **savefig_args)
             plt.clf()

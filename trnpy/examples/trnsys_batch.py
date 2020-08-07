@@ -1,22 +1,19 @@
-# -*- coding: utf-8 -*-
-'''
-**TRNpy: Parallelized TRNSYS simulation with Python**
+# Copyright (C) 2020 Joris Zimmermann
 
-Copyright (C) 2019 Joris Nettelstroth
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see https://www.gnu.org/licenses/.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see https://www.gnu.org/licenses/.
-
+"""TRNpy: Parallelized TRNSYS simulation with Python.
 
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
@@ -41,7 +38,7 @@ with the given ``dck`` objects.
 Post-processing of the results is possible, but will require adaptions
 for your specific situation.
 
-'''
+"""
 
 import logging
 import multiprocessing
@@ -50,8 +47,7 @@ import trnpy.core  # TRNpy core module
 
 
 def main():
-    '''Main function
-    '''
+    """Run the main function."""
     multiprocessing.freeze_support()  # Required on Windows
 
     # Global Pandas option for displaying terminal output
@@ -78,10 +74,12 @@ def main():
 
 
 def trnsys_batch_example_01(dck_file):
-    '''The first example for batch execution of TRNSYS with the TRNpy module.
+    """Run the first trnsys batch example.
+
+    The first example for batch execution of TRNSYS with the TRNpy module.
     We have an Excel file with combinations of parameter values and want one
     TRNSYS simulation for each row in the table.
-    '''
+    """
     # Create a DCK_processor object. It gives us methods to create and
     # manipulate the deck files that we want to work with
     dck_proc = trnpy.core.DCK_processor()
@@ -91,8 +89,8 @@ def trnsys_batch_example_01(dck_file):
     param_table = dck_proc.parametric_table_read(param_table_file)
 
     # Modify the table on demand (select only certain rows)
-#    param_table = param_table.loc[0:1]
-#    print(param_table)
+    # param_table = param_table.loc[0:1]
+    # print(param_table)
 
     # Create a deck list from the parameters and the original deck file
     dck_list = dck_proc.get_parametric_dck_list(param_table, dck_file)
@@ -121,11 +119,13 @@ def trnsys_batch_example_01(dck_file):
 
     # Post-processing: This is where the example gets quite specific
     def read_file_function(result_file_path):
-        '''Different TRNSYS printer outputs are formatted differently. We
+        """Define function for reading the result file.
+
+        Different TRNSYS printer outputs are formatted differently. We
         have to read the file in a way that gives us a usable pandas
         DataFrame. In this case the default TRNSYS output is particulary
         nasty! We have to account for tabs and whitespaces in the separator.
-        '''
+        """
         df = pd.read_csv(result_file_path,
                          sep=r'\t*\s+',
                          engine='python',
@@ -164,6 +164,7 @@ def trnsys_batch_example_01(dck_file):
 
 
 def trnsys_batch_example_02(dck_file_list):
+    """Run the second trnsys batch example."""
     # Create a DCK_processor object. It gives us methods to create and
     # manipulate the deck files that we want to work with
     dck_proc = trnpy.core.DCK_processor()
@@ -212,7 +213,7 @@ def trnsys_batch_example_02(dck_file_list):
 
 
 if __name__ == "__main__":
-    '''This function is executed when the script is started directly with
+    """This function is executed when the script is started directly with
     Python, not when it is loaded as a module.
-    '''
+    """
     main()

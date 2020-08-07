@@ -1,22 +1,19 @@
-# -*- coding: utf-8 -*-
-'''
-**TRNpy: Parallelized TRNSYS simulation with Python**
+# Copyright (C) 2020 Joris Zimmermann
 
-Copyright (C) 2019 Joris Nettelstroth
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see https://www.gnu.org/licenses/.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see https://www.gnu.org/licenses/.
-
+"""TRNpy: Parallelized TRNSYS simulation with Python.
 
 TRNpy: Parallelized TRNSYS simulation with Python
 =================================================
@@ -32,7 +29,7 @@ access to the core functionality of TRNpy without requiring the user to
 write any Python code. See the section 'Standalone TRNpy' in the README for
 more information.
 
-'''
+"""
 
 import argparse
 import logging
@@ -47,8 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    '''Main function. Perform all tasks for the interactive use of TRNpy.
-    '''
+    """Perform all tasks for the interactive use of TRNpy."""
     multiprocessing.freeze_support()  # Required on Windows
 
     # Define output format of logging function
@@ -69,14 +65,14 @@ def main():
 
 
 def file_dialog_dck(initialdir=os.getcwd()):
-    '''This function presents a file dialog for one or more TRNSYS deck files.
+    """Present a file dialog for one or more TRNSYS deck files.
 
     Args:
         None
 
     Return:
         paths (List): List of file paths
-    '''
+    """
     title = 'Please choose a TRNSYS Input File (*.dck)'
     logger.info(title)
     root = Tk()
@@ -94,14 +90,14 @@ def file_dialog_dck(initialdir=os.getcwd()):
 
 
 def file_dialog_parametrics(initialdir=os.getcwd()):
-    '''This function presents a file dialog for a parametric table file.
+    """Present a file dialog for a parametric table file.
 
     Args:
         None
 
     Return:
         path (str): File path
-    '''
+    """
     title = 'Choose a parametric table, or cancel to perform '\
             'a regular simulation'
     logger.info(title)
@@ -120,9 +116,11 @@ def file_dialog_parametrics(initialdir=os.getcwd()):
 
 
 def str2bool(v):
-    '''Convert a string to a boolean value. This is used in argparse to allow
-    the input of boolean values from the command line.
-    '''
+    """Convert a string to a boolean value.
+
+    This is used in argparse to allow the input of boolean values from
+    the command line.
+    """
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
@@ -132,7 +130,9 @@ def str2bool(v):
 
 
 def perform_config(trnexe, dck_proc):
-    '''Many configuration settings can be accessed by the user with the
+    """Read or create a configuration file and return its content.
+
+    Many configuration settings can be accessed by the user with the
     help of a YAML config file. If no config file exists, it is created
     with the current settings. If it exists, the settings are loaded.
 
@@ -143,7 +143,7 @@ def perform_config(trnexe, dck_proc):
 
     Returns:
         None
-    '''
+    """
     import yaml
     import sys
 
@@ -186,8 +186,10 @@ def perform_config(trnexe, dck_proc):
 
 
 def run_OptionParser(TRNExe, dck_proc, cfg):
-    '''Define and run the option parser. Set the user input and return the list
-    of decks. Needs TRNExe and dck_proc to get and set the option values.
+    """Define and run the option parser.
+
+    Set the user input and return the list of decks. Needs TRNExe and
+    dck_proc to get and set the option values.
 
     Args:
         TRNExe (TRNExe object): An instance of the TRNExe class
@@ -197,7 +199,7 @@ def run_OptionParser(TRNExe, dck_proc, cfg):
     Returns:
         dck_list (list): A list of dck objects
 
-    '''
+    """
     description = 'TRNpy: Parallelized TRNSYS simulation with Python. '\
         'Simulate all the TRNSYS deck files specified as DCK '\
         'arguments in serial or parallel. Specify a '\
@@ -209,8 +211,6 @@ def run_OptionParser(TRNExe, dck_proc, cfg):
     parser = argparse.ArgumentParser(description=description,
                                      formatter_class=argparse.
                                      ArgumentDefaultsHelpFormatter)
-
-#    parser.add_argument('--version', action='version', version='%(prog)s 0.3')
 
     group1 = parser.add_argument_group('Basic options', 'Use the ' +
                                        'following options to define how to ' +
@@ -352,7 +352,7 @@ def run_OptionParser(TRNExe, dck_proc, cfg):
 
 
 if __name__ == "__main__":
-    '''This part is executed when the script is started directly with
+    """This part is executed when the script is started directly with
     Python, not when it is loaded as a module.
-    '''
+    """
     main()
