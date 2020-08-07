@@ -34,6 +34,9 @@ import logging
 import multiprocessing
 import pandas as pd
 import yaml
+import time
+import xlsxwriter
+from collections.abc import Sequence
 from bokeh.command.bootstrap import main
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, ColumnDataSource, RangeTool
@@ -80,9 +83,6 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
     Returns:
         None
     """
-    from collections.abc import Sequence
-    import time
-
     if check_permission:
         try:
             # Try to complete the function without this permission check
@@ -90,7 +90,7 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
                         merge_cells=merge_cells, check_permission=False,
                         **kwargs)
             return  # Do not run the rest of the function
-        except PermissionError as e:
+        except (PermissionError, xlsxwriter.exceptions.FileCreateError) as e:
             # If a PermissionError occurs, run the whole function again, but
             # with another file path (with appended time stamp)
             logger.critical(e)
