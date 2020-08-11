@@ -156,10 +156,15 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
     return df
 
 
-def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
-                       palette=palette_default, y_label=None,
+def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
+                       tips_cols=[], palette=palette_default, y_label=None,
                        sum_circle_size=0, **kwargs):
     """Create stacked vertical bar plot in Bokeh from TRNSYS results.
+
+    By default, all columns in the DataFrame will be plotted. Pass ``None``
+    to stack_labels and/or stack_labels_neg to prevent that, or pass a list
+    with specific column names. If columns in stack_labels_neg are positive,
+    they will be made negative.
 
     If ``sum_circle_size`` is set ``> 0`` a circle with the sum is plotted.
 
@@ -168,6 +173,21 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()`` like
     ``plot_width``, etc.
     """
+    # Apply logic for default behaviour
+    if stack_labels is not None:
+        if len(stack_labels) == 0:
+            # If no columns are set, use all existing columns
+            stack_labels = [c for c in df_in.columns if df_in[c].sum() >= 0]
+    else:  # If stack_labels is None, then use an empty list
+        stack_labels = []
+
+    if stack_labels_neg is not None:
+        if len(stack_labels_neg) == 0:
+            # If no columns are set, use all existing columns
+            stack_labels_neg = [c for c in df_in.columns if df_in[c].sum() < 0]
+    else:  # If stack_labels_neg is None, then use an empty list
+        stack_labels_neg = []
+
     # Filter out non-existing columns
     stack_labels = [c for c in stack_labels if c in df_in.columns]
     stack_labels_neg = [c for c in stack_labels_neg if c in df_in.columns]
@@ -179,8 +199,10 @@ def bokeh_stacked_vbar(df_in, stack_labels, stack_labels_neg=[], tips_cols=[],
     # Prepare Data
     df = df_in.reset_index()  # Remove index
 
-    # Make 'negative' values actually negative
-    df[stack_labels_neg] = df[stack_labels_neg] * -1
+    for col in stack_labels_neg:
+        # Make sure values in the 'negative' list are actually negative
+        if df[col].sum() > 0:
+            df[col] = df[col] * -1
     # Calculate new column 'sum' with sum of each row
     df['sum'] = df[stack_labels].sum(axis=1) + df[stack_labels_neg].sum(axis=1)
 
