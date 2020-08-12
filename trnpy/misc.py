@@ -366,6 +366,11 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = list(df_in.columns)
 
+    # Filter out non-existing, empty and NaN columns
+    y_cols = [col for col in y_cols if col in df_in.columns]
+    y_cols = [col for col in y_cols if any(df_in[col] != 0)]
+    y_cols = [col for col in y_cols if any(df_in[col].notna())]
+
     df = df_in.reset_index()  # Remove index
     selection = y_cols + [x_col] + list(tips_cols)
     source = ColumnDataSource(data=df[selection])  # Use required columns
