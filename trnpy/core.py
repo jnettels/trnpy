@@ -124,16 +124,22 @@ class TRNExe(object):
                      ' ('+dck.file_path_dest+')')
 
         # Wait until the process is finished
-        while proc.poll() is None:
-            # While we wait, we check if TRNSYS is still running
-            if self.TRNExe_is_alive(proc.pid) is False:
-                logger.debug('TRNSYS is inactive and may have encountered '
-                             'an error, killing the process in 10 seconds: ' +
-                             dck.file_path_dest)
-                time.sleep(10)
-                proc.terminate()
-                dck.error_msg_list.append('Low CPU load - timeout')
-                dck.success = False
+        try:
+            while proc.poll() is None:
+                # While we wait, we check if TRNSYS is still running
+                if self.TRNExe_is_alive(proc.pid) is False:
+                    logger.debug('TRNSYS is inactive and may have encountered '
+                                 'an error, killing the process in 10 seconds '
+                                 ': ' + dck.file_path_dest)
+                    time.sleep(10)
+                    proc.terminate()
+                    dck.error_msg_list.append('Low CPU load - timeout')
+                    dck.success = False
+        except KeyboardInterrupt:
+            print()
+            logger.critical('Killing TRNSYS process ' + dck.file_path_dest)
+            proc.terminate()
+            proc.wait()
 
         # Check for error messages in the log and store them in the deck object
         if self.check_log_for_errors(dck) is False or dck.success is False:
