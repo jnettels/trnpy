@@ -541,11 +541,12 @@ class DCK_processor(object):
                                                     dck_file_list)
 
         self.rewrite_dcks(dck_list)
-        self.copy_assigned_files(dck_list, find_files=True)
+        if copy_files:
+            self.copy_assigned_files(dck_list, find_files=True)
         return dck_list
 
     def parametric_table_read(self, param_table_file, **kwargs):
-        """Read. a parametric table from a given file.
+        """Read a parametric table from a given file.
 
         Return it as a DataFrame. Uses ``read_filetypes()`` to read the file.
 
@@ -557,9 +558,10 @@ class DCK_processor(object):
         """
         parametric_table = self.read_filetypes(param_table_file, **kwargs)
 
-        logger.info(param_table_file+':')
         if logger.isEnabledFor(logging.INFO):
-            print(parametric_table)
+            if not parametric_table.empty:
+                logger.info(param_table_file+':')
+                print(parametric_table)
 
         return parametric_table
 
@@ -578,9 +580,10 @@ class DCK_processor(object):
         combis = [dict(items) for items in itertools.product(*flat)]
         parametric_table = pd.DataFrame.from_dict(combis)
 
-        logger.info('Parametric table from combinations:')
         if logger.isEnabledFor(logging.INFO):
-            print(parametric_table)
+            if not parametric_table.empty:
+                logger.info('Parametric table from combinations:')
+                print(parametric_table)
 
         return parametric_table
 
