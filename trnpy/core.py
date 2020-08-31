@@ -512,7 +512,8 @@ class DCK_processor(object):
         self.sim_folder = sim_folder
         self.regex_result_files = regex_result_files
 
-    def parametric_table_auto(self, parametric_table, dck_file_list):
+    def parametric_table_auto(self, parametric_table, dck_file_list,
+                              copy_files=True):
         """Automate the creation deck objects from a parametric table.
 
         Conveniently wrap the steps in the most common use case.
@@ -524,6 +525,9 @@ class DCK_processor(object):
             parametric_table (DataFrame): Pandas DataFrame
 
             dck_file_list (list): List of file paths (or single path string)
+
+            copy_files (bool, optional): Find and copy all assigned files
+            from the source to the simulation folder. Default is ``True``.
 
         Returns:
             dck_list (list): List of dck objects
