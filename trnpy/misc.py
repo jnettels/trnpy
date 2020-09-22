@@ -47,7 +47,7 @@ from bokeh.palettes import Spectral11 as palette_default
 logger = logging.getLogger(__name__)
 
 
-def df_to_excel(df, path, sheet_names=[], merge_cells=False,
+def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
                 check_permission=True, **kwargs):
     """Write one or more DataFrames to Excel files.
 
@@ -58,6 +58,18 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
     In case of a ``PermissionError`` (happens when the Excel file is currently
     opended), the file is instead saved with a time stamp.
 
+    The list ``styles`` allows some basic formatting of specific cells,
+    defined by one dict per sheet in the workbook. In the example below,
+    a format 'format_EUR' is defined in terms of cell format and width
+    and assigned to certain columns:
+
+    .. code:: python
+
+        excel_fmt_eur = '_-* #,##0 €_-;-* #,##0 €_-;_-* "-" €_-;_-@_-'
+        styles=[{'columns': {'B:Z': 'format_EUR'},
+                 'formats': {'format_EUR': {'num_format': excel_fmt_eur}},
+                 'widths': {'format_EUR': 12}}]
+
     Additional keyword arguments are passed down to ``to_excel()``.
 
     The function calls itself recursively to achieve those features.
@@ -67,14 +79,18 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
 
         path (str): The full file path to save the DataFrame to
 
-        sheet_names (list): List of sheet names to use when saving multiple
-        DataFrames to the same Excel file
+        sheet_names (list, optional): List of sheet names to use when saving
+        multiple DataFrames to the same Excel file
+
+        styles (list, optional): List of dicts that contain settings for
+        formatting specific cells, one dict per sheet. Dicts must have the
+        keys "columns", "formats" and "widths", see example above.
 
         merge_cells (boolean, optional): Write MultiIndex and Hierarchical
         Rows as merged cells. Default False.
 
-        check_permission (boolean): If the file already exists, instead try
-        to save with an appended time stamp.
+        check_permission (boolean, optional): If the file already exists,
+        instead try to save with an appended time stamp.
 
         freeze_panes (tuple or boolean, optional): Per default, the sheet
         cells are frozen to always keep the index visible (by determining the
@@ -86,7 +102,7 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
     if check_permission:
         try:
             # Try to complete the function without this permission check
-            df_to_excel(df, path, sheet_names=sheet_names,
+            df_to_excel(df, path, sheet_names=sheet_names, styles=styles,
                         merge_cells=merge_cells, check_permission=False,
                         **kwargs)
             return  # Do not run the rest of the function
@@ -99,7 +115,7 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
             path_time = (os.path.splitext(path)[0] + '_' +
                          ts + os.path.splitext(path)[1])
             logger.critical('Writing instead to:  '+path_time)
-            df_to_excel(df, path_time, sheet_names=sheet_names,
+            df_to_excel(df, path_time, sheet_names=sheet_names, styles=styles,
                         merge_cells=merge_cells, **kwargs)
             return  # Do not run the rest of the function
 
@@ -116,10 +132,33 @@ def df_to_excel(df, path, sheet_names=[], merge_cells=False,
                 sheet = str(sheet_names[i])
             except IndexError:
                 sheet = str(i)
+
             # Add current sheet to the ExcelWriter by calling this
             # function recursively
             df_to_excel(df=df_, path=writer, sheet_name=sheet,
                         merge_cells=merge_cells, **kwargs)
+
+            # Try adding format styles to the workbook sheets
+            if len(styles) > 0:
+                try:
+                    workbook = writer.book
+                    worksheet = writer.sheets[sheet]
+                    formats = styles[i]['formats']
+                    wb_formats = dict()
+                    for fmt_name, format_ in formats.items():
+                        # Example: format_ = {'num_format': '0%'}
+                        wb_formats[fmt_name] = workbook.add_format(format_)
+
+                    columns = styles[i]['columns']
+                    widths = styles[i]['widths']
+                    for col, fmt_name in columns.items():
+                        # Set the format and width of the column
+                        worksheet.set_column(col, widths[fmt_name],
+                                             wb_formats[fmt_name])
+                except Exception as ex:
+                    logger.exception(ex)
+                    pass
+
         writer.save()  # Save the actual Excel file
 
     else:
@@ -227,6 +266,9 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
                          legend_label=[x+" " for x in stack_labels],
                          line_width=0,  # Prevent outline for height of 0
                          )
+
+    p.legend[0].items.reverse()  # Reverse order of legend entries
+
     if len(stack_labels_neg) > 0:
         palette_neg = palette[-len(stack_labels_neg):]
     else:
