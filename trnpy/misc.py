@@ -267,7 +267,8 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
                          line_width=0,  # Prevent outline for height of 0
                          )
 
-    p.legend[0].items.reverse()  # Reverse order of legend entries
+    if len(p.legend) > 0:
+        p.legend[0].items.reverse()  # Reverse order of legend entries
 
     if len(stack_labels_neg) > 0:
         palette_neg = palette[-len(stack_labels_neg):]
