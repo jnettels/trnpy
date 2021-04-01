@@ -159,6 +159,12 @@ class TRNExe(object):
         # Return the deck object
         return dck
 
+    def check_logs_for_errors(self, dck_list):
+        """Check logs of all dcks in dck_list for errors."""
+        for dck in dck_list:
+            self.check_log_for_errors(dck)
+        return dck_list
+
     def check_log_for_errors(self, dck):
         """Store errors in error_msg_list. Return False if errors are found.
 
@@ -184,6 +190,7 @@ class TRNExe(object):
         if match_list:  # Matches of the regular expression were found
             for msg in match_list:
                 dck.error_msg_list.append(msg)  # Store error messages
+                dck.success = False
             return False
         else:  # No error messages found
             return True
