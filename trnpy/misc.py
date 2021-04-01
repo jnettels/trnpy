@@ -35,7 +35,6 @@ import multiprocessing
 import pandas as pd
 import yaml
 import time
-import xlsxwriter
 from collections.abc import Sequence
 from bokeh.command.bootstrap import main
 from bokeh.plotting import figure
@@ -106,7 +105,7 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
                         merge_cells=merge_cells, check_permission=False,
                         **kwargs)
             return  # Do not run the rest of the function
-        except (PermissionError, xlsxwriter.exceptions.FileCreateError) as e:
+        except PermissionError as e:
             # If a PermissionError occurs, run the whole function again, but
             # with another file path (with appended time stamp)
             logger.critical(e)
