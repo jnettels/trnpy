@@ -684,7 +684,7 @@ class DCK_processor(object):
             # Some replacements are performed directly, others have
             # to be prepared (the type called "value of key")
             for key, value in dck.replace_dict.items():
-                if 'ASSIGN' in key:
+                if 'ASSIGN' in key or 'LIMITS' in key:
                     # Use the replacement strings unchanged
                     self.add_replacements({key: value}, dck)
                 else:
