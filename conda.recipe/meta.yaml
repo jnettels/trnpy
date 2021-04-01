@@ -10,6 +10,8 @@ source:
 build:
   number: {{ GIT_DESCRIBE_NUMBER }}
 
+  noarch: python
+
   entry_points:
     # Put any entry points (scripts to be generated automatically) here.
     - trnpy = trnpy.trnpy_script:main
@@ -34,5 +36,5 @@ about:
     description: 'Parallelized TRNSYS simulation with Python'
     license: 'GPL3'
     license_file: LICENSE.txt
-    author: 'Joris Nettelstroth'
-    author_email: 'joris.nettelstroth@stw.de'
+    author: 'Joris Zimmermann'
+    author_email: 'joris.zimmermann@stw.de'
