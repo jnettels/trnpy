@@ -19,14 +19,14 @@ requirements:
         - python
         - setuptools
         - setuptools_scm
-        - pandas >=0.24.1
+        - pandas >=1.2.1
 
     run:
         - python
-        - pandas >=0.24.1
+        - pandas >=1.2.1
         - pyyaml >=5.1
         - psutil
-        - xlrd
+        - openpyxl
 
 about:
     home: https://github.com/jnettels/trnpy
