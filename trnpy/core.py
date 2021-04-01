@@ -945,7 +945,8 @@ class DCK_processor(object):
         return error_found
 
     def results_collect(self, dck_list, read_file_function, create_index=True,
-                        origin=None):
+                        origin=None, store_success=True, store_hours=True,
+                        remove_leap_year=True):
         """Collect the results of the simulations.
 
         Combine the result files of the parametric runs into DataFrames. They
@@ -985,6 +986,15 @@ class DCK_processor(object):
             origin (str, optional): Start date for index (``'2003-01-01'``).
             Used if ``create_index=True``. Default is start of current year.
 
+            store_success (bool, optional): Save boolean info about successful
+            simulation in new column ``success``. Default: True
+
+            store_hours (bool, optional): Save the original time column in
+            a new column ``HOURS``. Default: True
+
+            remove_leap_year (bool, optional): Try to remove February 29 from
+            leap years. Default: True
+
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         """
@@ -1002,7 +1012,9 @@ class DCK_processor(object):
                     # Add the 'hash' and all the key, value pairs to DataFrame
                     if dck.hash is not None:
                         df_new['hash'] = dck.hash
-                    df_new['success'] = dck.success  # Store simulation success
+                    if store_success:
+                        # Store simulation success
+                        df_new['success'] = dck.success
                     for key, value in dck.replace_dict.items():
                         df_new[key] = value
 
@@ -1030,13 +1042,16 @@ class DCK_processor(object):
                 print(file)
 
         if create_index:
-            result_data = self.results_create_index(result_data, origin=origin,
-                                                    replace_dict=dck_list[0]
-                                                    .replace_dict)
+            result_data = self.results_create_index(
+                result_data, replace_dict=dck_list[0].replace_dict,
+                origin=origin, store_hours=store_hours,
+                remove_leap_year=remove_leap_year)
 
         return result_data
 
-    def results_create_index(self, result_data, replace_dict={}, origin=None):
+    def results_create_index(self, result_data, replace_dict={}, origin=None,
+                             time_names=['TIME', 'Time', 'Period'],
+                             store_hours=True, remove_leap_year=True):
         """Put the time and parameter columns into the index of the DataFrame.
 
         The function expects the return of ``results_collect()``. This
@@ -1071,6 +1086,15 @@ class DCK_processor(object):
             DataFrame we use datetime for the time column, which needs a
             fully defined date. Defaults to start of the current year.
 
+            time_names (list, optional): List of column names that are
+            used for identifying the time column.
+
+            store_hours (bool, optional): Save the original time column in
+            a new column ``HOURS``. Default: True
+
+            remove_leap_year (bool, optional): Try to remove February 29 from
+            leap years. Default: True
+
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         """
@@ -1084,15 +1108,16 @@ class DCK_processor(object):
             origin = pd.Timestamp(origin)  # Convert string to datetime object
 
         for key, df in result_data.items():
-            if 'TIME' in df.columns:
-                t_col = 'TIME'
-            elif 'Time' in df.columns:
-                t_col = 'Time'
-            else:
-                continue
+            t_col = None
+            for time_name in time_names:
+                if time_name in df.columns:
+                    t_col = time_name
+            if t_col is None:
+                continue  # Do not create index for this file
             # Convert TIME column to float
             df[t_col] = df[t_col].astype('float64')
-            df['HOURS'] = df[t_col]  # Store the float hours
+            if store_hours:
+                df['HOURS'] = df[t_col]  # Store the float hours
 
             # Determine frequency as float, string and TimeDelta
             freq_float = df[t_col][1] - df[t_col][0]
@@ -1101,46 +1126,52 @@ class DCK_processor(object):
             freq_timedelta = time_index[1] - time_index[0]
 
             # Convert the TIME float column to the datetime format
-            try:
-                # Approach where leap year days are not included in the
-                # resulting datetime column. This will fail if simulation
-                # did not run for one or multiple complete years.
-
-                # df is already the combined DataFrame of all simulations.
-                # Find the length of the longest simulation
-                n_hours = max(df[t_col])
-
-                # Check if data is suited for this approach
-                if n_hours % 8760 != 0 or len(df[t_col]) % n_hours != 0:
-                    raise ValueError('Simulation data length is not one or '
-                                     + 'multiple complete years (8760 hours).'
-                                     + ' Cannot remove leap year days.')
-
-                n_years = int(n_hours/8760)  # Number of years per simulation
-                # Number of simulations (i.e. for different parameters)
-                n_sim = int(len(df[t_col])*freq_float/n_hours)
-
-                # Create date range, with the correct start and end date
-                end_date = origin.replace(year=origin.year + n_years)
-                dr = pd.date_range(start=origin + freq_timedelta,
-                                   end=end_date, freq=freq_str+'H')
-                # Remove leap year days from the date range
-                dr = dr[~((dr.month == 2) & (dr.day == 29))]
-
-                # Copy the date range for each simulation
-                dr_copy = dr.copy()
-                for n in range(n_sim - 1):
-                    dr_copy = dr_copy.append(dr)
-                df[t_col] = dr_copy  # Insert the date range into the DataFrame
-
-            except Exception as ex:
-                logger.exception(ex)
-                logger.critical('Creating datetime index without removing '
-                                + 'leap year days.')
-
-                # "Safer" way of converting the float TIME column to datetime.
-                # However, this creates a 29.2. in all leap years
+            if not remove_leap_year:
                 df[t_col] = pd.to_datetime(df[t_col], unit='h', origin=origin)
+
+            else:
+                try:
+                    # Approach where leap year days are not included in the
+                    # resulting datetime column. This will fail if simulation
+                    # did not run for one or multiple complete years.
+
+                    # df is already the combined DataFrame of all simulations.
+                    # Find the length of the longest simulation
+                    n_hours = max(df[t_col])
+
+                    # Check if data is suited for this approach
+                    if n_hours % 8760 != 0 or len(df[t_col]) % n_hours != 0:
+                        raise ValueError(
+                            'Simulation data length is not one or multiple '
+                            'complete years (8760 hours). Cannot remove leap '
+                            'year days.')
+
+                    n_years = int(n_hours/8760)  # Years per simulation
+                    # Number of simulations (i.e. for different parameters)
+                    n_sim = int(len(df[t_col])*freq_float/n_hours)
+
+                    # Create date range, with the correct start and end date
+                    end_date = origin.replace(year=origin.year + n_years)
+                    dr = pd.date_range(start=origin + freq_timedelta,
+                                       end=end_date, freq=freq_str+'H')
+                    # Remove leap year days from the date range
+                    dr = dr[~((dr.month == 2) & (dr.day == 29))]
+
+                    # Copy the date range for each simulation
+                    dr_copy = dr.copy()
+                    for n in range(n_sim - 1):
+                        dr_copy = dr_copy.append(dr)
+                    df[t_col] = dr_copy  # Insert date range into the DataFrame
+
+                except Exception as ex:
+                    logger.exception(ex)
+                    logger.critical('Creating datetime index without removing '
+                                    + 'leap year days.')
+
+                    # Safe way of converting the float TIME column to datetime.
+                    # However, this creates a 29.2. in all leap years
+                    df[t_col] = pd.to_datetime(df[t_col], unit='h',
+                                               origin=origin)
 
             # With a simulation time step of one minute, rounding errors
             # can produce an imperfect index. Rounding to seconds may fix it:
@@ -1177,7 +1208,9 @@ class DCK_processor(object):
                 df_leap['year'] = df_leap.index.get_level_values(t_col).year
                 df_leap = df_leap[df_leap['is_leap_year']]
                 years = set(df_leap['year'].astype(str))  # Set of unique years
-                logger.warning(key+': Data has leap years '+', '.join(years))
+                if remove_leap_year:
+                    logger.warning(
+                        key+': Data has leap years '+', '.join(years))
 
         return result_data
 
