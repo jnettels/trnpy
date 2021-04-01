@@ -1319,7 +1319,7 @@ class DCK_processor(object):
         if len(df.index.names) == 1:
             # If there is only the time column in the index, the resampling
             # is straight forward
-            sum_df = df[cols_sum].resample(freq, **kwargs).sum()
+            sum_df = df[cols_sum].resample(freq, **kwargs).sum(skipna=False)
             mean_df = df[cols_mean].resample(freq, **kwargs).mean()
 
         else:
@@ -1329,8 +1329,13 @@ class DCK_processor(object):
             levels = range(len(df.index.names))[:-1]  # All columns except time
 
             if len(cols_sum) > 0:
-                sum_df = (df[cols_sum].groupby([level_vls(i) for i in levels]
-                          + [pd.Grouper(freq=freq, **kwargs, level=-1)]).sum())
+                group = (df[cols_sum].groupby([level_vls(i) for i in levels]
+                         + [pd.Grouper(freq=freq, **kwargs, level=-1)],
+                         dropna=False))
+                # sum(skipna=False) is required to make the sum of nan = nan
+                # https://github.com/pandas-dev/pandas/issues/15675
+                # sum_df = group.sum(skipna=False)  # TODO (not implemented)
+                sum_df = group.mean() * group.count()  # workaround
             else:
                 sum_df = pd.DataFrame()  # No sum() required, use empty df
             if len(cols_mean) > 0:
