@@ -42,7 +42,7 @@ import psutil
 import itertools
 
 # Default values that are used by multiple classes:
-regex_result_files_def = r'Result|\.sum|\.pr.|\.plt'  # treat as result files
+regex_result_files_def = r'Result|\.sum|\.pr.|\.plt|\.out'  # result files
 
 # Define the logging function
 logger = logging.getLogger(__name__)
