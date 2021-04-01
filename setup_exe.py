@@ -125,14 +125,17 @@ shortcut_table = [
      ),
      ]
 
+author = 'Joris Zimmermann'
+description = 'Parallelized TRNSYS simulation with Python'
+
 # The setup function
 setup(
     name='trnpy',
     version=version,
-    description='Parallelized TRNSYS simulation with Python',
+    description=description,
     long_description=open('README.md').read(),
     license='GPL-3.0',
-    author='Joris Zimmermann',
+    author=author,
     author_email='joris.zimmermann@stw.de',
     url='https://github.com/jnettels/trnpy',
 
@@ -230,6 +233,9 @@ setup(
                                ]
                            },
              'bdist_msi': {'data': {"Shortcut": shortcut_table},
+                           'summary_data': {'author': author,
+                                            'comments': description},
+                           'install_icon': r'./res/icon.ico',
                            'upgrade_code':
                                '{0f4794c7-5129-4414-8fd5-b8fff2816e45}',
                            },
