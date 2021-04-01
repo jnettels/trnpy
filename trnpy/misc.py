@@ -647,7 +647,7 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 
 def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    tol=0.001, random_state=1, plots_show=False,
-                   plots_dir=r'.\Result', load_optimizer_pickle_file=None,
+                   plots_dir=r'.\Result', optimizer_pickle=None,
                    opt_cfg='optimizer.yaml', **skopt_kwargs):
     r"""Perform optimization for a TRNSYS-Simulation with scikit-optimize.
 
@@ -703,7 +703,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         plots_dir (str, optional): Directory to save skopt.plots into. If
         ``None``, no plots are saved. Default is ``".\Result"``
 
-        load_optimizer_pickle_file (str, optional): A path to an optimizer
+        optimizer_pickle (str, optional): A path to an optimizer
         instance dumped before with pickle. This allows to continue a
         previous optimization process. Default is ``None``.
 
@@ -711,12 +711,22 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         the entry ``kill: True``, the optimization is stopped before the next
         round. Default is ``"optimizer.yaml"``
 
-        skop_kwargs: Optional keyword arguments that are passed on to
+        skopt_kwargs: Optional keyword arguments that are passed on to
         skopt.Optimizer, e.g.
 
             * n_initial_points (int, default=10):
               Number of evaluations of `func` with random initialization
               points before approximating it with `base_estimator`.
+
+            * initial_point_generator (str, default: `"random"`):
+              Sets a initial points generator. Can be either
+
+              - `"random"` for uniform random numbers,
+              - `"sobol"` for a Sobol sequence,
+              - `"halton"` for a Halton sequence,
+              - `"hammersly"` for a Hammersly sequence,
+              - `"lhs"` for a latin hypercube sequence,
+              - `"grid"` for a uniform grid sequence
 
             * See more: https://scikit-optimize.github.io/#skopt.Optimizer
 
@@ -724,13 +734,24 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         opt_res (OptimizeResult, scipy object): The optimization result
         returned as a ``OptimizeResult`` object.
 
-    TODO: Use named space dimensions instead of adding a ``labels`` list
-    to the result object. However, currently there are issues with the
-    dimension names getting lost at some point.
+
+    .. note::
+
+        I made the following change to ``skopt\optimizer\optimizer.py``
+        in function ``def _ask(self)`` to prevent dublicate evaluations:
+
+        .. code:: python
+
+            if abs(min_delta_x) <= 1e-8:
+                next_x_new = self.space.rvs(random_state=self.rng)[0]
+                warnings.warn("The objective has been evaluated at point {} "
+                              "before, using {} instead"
+                              .format(next_x, next_x_new))
+                next_x = next_x_new
+
     """
     import skopt
     import skopt.plots
-    import pickle
     import matplotlib as mpl
     import matplotlib.pyplot as plt  # Plotting library
 
@@ -739,21 +760,25 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     if n_cores == 0:  # Set number of CPU cores to use
         n_cores = multiprocessing.cpu_count() - 1
 
-    if load_optimizer_pickle_file is not None:
-        # Load an existing optimizer instance
-        with open(load_optimizer_pickle_file, 'rb') as f:
-            sk_optimizer = pickle.load(f)
-            result = sk_optimizer.get_result()
-            result.labels = list(opt_dimensions.keys())
-            logger.info('Optimizer: Loaded existing optimizer instance '
-                        + load_optimizer_pickle_file)
-    else:
-        # Default behaviour: Start fresh with a new optimizer instance
+    if optimizer_pickle is None:
+        # Start a fresh optimization
         sk_optimizer = skopt.Optimizer(
-            dimensions=opt_dimensions.values(),
+            dimensions=list(opt_dimensions.values()),
             random_state=random_state,
             **skopt_kwargs,
-        )
+            )
+
+        # Somewhat hacky, but here we store the name of each dimension
+        # in the proper place, i.e. within the `space` object
+        for i, name in enumerate(opt_dimensions.keys()):
+            sk_optimizer.space.dimensions[i].name = name
+
+    else:
+        # Load an existing optimizer instance from a pickled result object
+        result = skopt.utils.load(optimizer_pickle)
+        sk_optimizer = result.specs['args']['self']
+        logger.info('Optimizer: Loaded existing optimizer results '
+                    + optimizer_pickle)
 
     # Start the optimization loop
     round_ = 1
@@ -763,8 +788,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     eval_func_kwargs = dict()
 
     while count < n_calls:
-        logger.info('Optimizer: Starting iteration round '+str(round_)+' ('
-                    + str(count)+' simulations done).')
+        logger.info('Optimizer: Starting iteration round {} ({} of {} '
+                    'simulations done)'.format(round_, count, n_calls))
 
         if user_ask and len(user_next_x) > 0:
             next_x = user_next_x
@@ -773,13 +798,15 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         else:
             try:  # get points to evaluate
                 next_x = sk_optimizer.ask(n_points=n_cores)
+
             except ValueError as ex:
                 logger.exception(ex)
-                continue
+                raise
+                # continue
 
         try:
             param_table = pd.DataFrame.from_records(
-                    next_x, columns=opt_dimensions.keys())
+                    next_x, columns=sk_optimizer.space.dimension_names)
         except Exception as ex:
             logger.exception(ex)
             continue
@@ -790,7 +817,6 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         next_y = eval_func(param_table, **eval_func_kwargs)
         result = sk_optimizer.tell(next_x, next_y)
         result.nit = count
-        result.labels = list(opt_dimensions.keys())
 
         if result.fun < tol:
             result.success = True
@@ -802,10 +828,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         if plots_dir is not None and not os.path.exists(plots_dir):
             os.makedirs(plots_dir)
         if plots_dir is not None:
-            with open(os.path.join(plots_dir, 'optimizer.pkl'), 'wb') as f:
-                pickle.dump(sk_optimizer, f)
-            with open(os.path.join(plots_dir, 'opt_result.pkl'), 'wb') as f:
-                pickle.dump(result, f)
+            skopt.utils.dump(result, os.path.join(plots_dir, 'optimizer.pkl'),
+                             store_objective=True)
 
         # Generate and save optimization result plots:
         if result.space.n_dims > 1:
@@ -818,12 +842,12 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             if plots_dir is not None and not os.path.exists(plots_dir):
                 os.makedirs(plots_dir)
 
-            skopt.plots.plot_evaluations(result, dimensions=result.labels)
+            skopt.plots.plot_evaluations(result)
             if plots_dir is not None:
                 plt.savefig(os.path.join(plots_dir, 'skopt_evaluations.png'),
                             bbox_inches='tight', dpi=200)
             try:  # plot_objective fails before n_initial_points are done
-                skopt.plots.plot_objective(result, dimensions=result.labels)
+                skopt.plots.plot_objective(result)
             except IndexError:
                 logger.info('Not yet enough data to plot partial dependence.')
             else:
@@ -878,7 +902,8 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
 
     logger.info('Optimizer: Best fit after '+str(count)+' simulations: '
                 + str(result.fun) + '\n'
-                + pd.Series(data=result.x, index=result.labels).to_string()
+                + pd.Series(data=result.x,
+                            index=result.space.dimension_names).to_string()
                 )
 
     if result.space.n_dims > 1:
@@ -896,6 +921,9 @@ def convert_user_next_ranges(args_list):
     for the range() function (start, stop, step). Then get the product of
     all those ranges. This allows to manually define a grid of points for the
     optimizer to simulate.
+
+    While this works, using ``skopt_optimize(initial_point_generator="grid"``)
+    is much easier!
     """
     import itertools
     if len(args_list) > 0:
