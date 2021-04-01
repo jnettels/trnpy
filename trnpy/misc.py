@@ -301,10 +301,11 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
     p.outline_line_color = None
     p.xgrid.grid_line_color = None
     p.xaxis.major_label_orientation = 1.2
-    p.legend.background_fill_alpha = 0.5
-    p.legend.location = "top_left"
-    p.legend.click_policy = "hide"
-    # p.toolbar.autohide = True  # TODO Seems bugged
+    if p.legend:
+        p.legend.background_fill_alpha = 0.5
+        p.legend.location = "top_left"
+        p.legend.click_policy = "hide"
+        # p.toolbar.autohide = True  # TODO Seems bugged
     if y_label is not None:
         p.yaxis.axis_label = y_label
     return p
@@ -374,12 +375,13 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
 
         hover = HoverTool(tooltips='$name: @$name')
         p.add_tools(hover)
-        p.legend.location = "top_right"
-        p.legend.click_policy = "hide"
-        p.legend.label_text_font_size = '8pt'
-        p.legend.spacing = 1
-        p.legend.padding = 5
-        # p.toolbar.autohide = True  # TODO Seems bugged
+        if p.legend:
+            p.legend.location = "top_right"
+            p.legend.click_policy = "hide"
+            p.legend.label_text_font_size = '8pt'
+            p.legend.spacing = 1
+            p.legend.padding = 5
+            # p.toolbar.autohide = True  # TODO Seems bugged
 
         if y_label is not None:
             p.yaxis.axis_label = y_label
@@ -550,11 +552,12 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
 
     hover = HoverTool(tooltips='$name: @$name')
     p.add_tools(hover)
-    p.legend.location = "top_left"
-    p.legend.click_policy = "hide"
-    p.legend.label_text_font_size = '8pt'
-    p.legend.spacing = 0
-    p.legend.padding = 2
+    if p.legend:
+        p.legend.location = "top_left"
+        p.legend.click_policy = "hide"
+        p.legend.label_text_font_size = '8pt'
+        p.legend.spacing = 0
+        p.legend.padding = 2
     p.title.text_font_size = '8pt'
 
     p.yaxis.major_label_orientation = "vertical"
