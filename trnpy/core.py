@@ -66,6 +66,7 @@ class TRNExe(object):
                  n_cores=0,
                  check_vital_sign=True,
                  pause_after_error=False,
+                 delay=1,
                  ):
         """Initialize the object.
 
@@ -88,6 +89,13 @@ class TRNExe(object):
             able to pause the live plotter during a simulation.
             Default is ``True``.
 
+            pause_after_error (bool, optional): Pause the following simulations
+            if an error occured. Default is ``False``.
+
+            delay (float, optional): Seconds of delay for each simulation
+            start. Helps prevent I/O-errors that seem to occur when two
+            TRNSYS processes are started at the same moment. Default is ``1``.
+
         Returns:
             None
         """
@@ -97,16 +105,23 @@ class TRNExe(object):
         self.n_cores = n_cores
         self.check_vital_sign = check_vital_sign
         self.pause_after_error = pause_after_error
+        self.delay = delay  # seconds delay for each simulation start
 
-    def run_TRNSYS_dck(self, dck):
+    def run_TRNSYS_dck(self, dck, delay=0):
         """Run a TRNSYS simulation with the given deck dck_file.
 
-        A couple of seconds random delay are added before calling the TRNSYS
-        executable. This may prevent ``I/O Error`` messages from TRNSYS
-        that were sometimes occurring.
-        """
-        import random
+        Args:
+            dck (dck object): A DCK object to simulate
 
+            delay (float): A time in seconds
+
+        Returns:
+            None
+
+        The ``delay`` in seconds is added before calling the TRNSYS
+        executable. This should prevent ``I/O Error`` messages from TRNSYS
+        that are otherwise sometimes occurring.
+        """
         if not os.path.exists(self.path_TRNExe):
             raise FileNotFoundError('TRNExe.exe not found: '+self.path_TRNExe)
 
@@ -115,7 +130,7 @@ class TRNExe(object):
         else:
             mode_trnsys = '/n'  # batch mode
 
-        time.sleep(random.uniform(0, 5))  # Start with random delay (seconds)
+        time.sleep(delay)  # Start with a delay (seconds)
 
         proc = subprocess.Popen([self.path_TRNExe, dck.file_path_dest,
                                  mode_trnsys])
@@ -265,8 +280,10 @@ class TRNExe(object):
             """For short lists, imap seemed the fastest option.
             With imap, the result is a consumable iterator"""
             # map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
-            """With map_async, the results are available immediately"""
-            map_result = pool.map_async(self.run_TRNSYS_dck, dck_list)
+            """With starmap_async, the results are available immediately"""
+            delay_list = [x*self.delay for x in range(len(dck_list))]
+            map_result = pool.starmap_async(self.run_TRNSYS_dck,
+                                            zip(dck_list, delay_list))
 
             pool.close()  # No more processes can be launched
             self.print_progress(map_result, start_time)
@@ -334,7 +351,11 @@ class TRNExe(object):
             # https://github.com/spyder-ide/spyder/issues/195
             print('\r'+text, end='\r')
             time.sleep(1.0)  # Sleep a certain number of seconds
-        print('\r 100.0% done.', end='\r')  # Finish the last output with 100%
+        # Finish the last output with 100%
+        t_elapsed = pd.to_timedelta(time.time() - start_time, unit='s')
+        text = ('100.0% done. Time elapsed: {}                            '
+                .format(str(t_elapsed).split('.')[0]))
+        print('\r'+text)
         return
 
 
