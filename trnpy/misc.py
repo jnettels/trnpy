@@ -188,7 +188,7 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
     """
     for column_ in df.columns:
         for filter_ in filters:
-            if filter_ in column_:
+            if filter_ in column_ or filter_ == column_:
                 df[column_][mask] = value
                 break  # Break inner for-loop if one filter was matched
     return df
