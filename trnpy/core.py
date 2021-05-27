@@ -1314,20 +1314,20 @@ class DCK_processor(object):
         cols_found = []
         for column in df.columns:
             if prio == 'sum':
-                if re.search(regex_sum, column):
+                if bool(re.search(regex_sum, column)):
                     cols_sum.append(column)
                     cols_found.append(column)
-                elif re.search(regex_mean, column):
+                elif bool(re.search(regex_mean, column)):
                     cols_mean.append(column)
                     cols_found.append(column)
                 else:
                     logger.debug('Column "'+column+'" does not match the '
                                  'regular expressions and is not resampled.')
             elif prio == 'mean':
-                if re.search(regex_mean, column):
+                if bool(re.search(regex_mean, column)):
                     cols_mean.append(column)
                     cols_found.append(column)
-                elif re.search(regex_sum, column):
+                elif bool(re.search(regex_sum, column)):
                     cols_sum.append(column)
                     cols_found.append(column)
                 else:
