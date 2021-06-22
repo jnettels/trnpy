@@ -1272,7 +1272,8 @@ class DCK_processor(object):
         return df_new
 
     def results_resample(self, df, freq, regex_sum=r'^Q_|^E_',
-                         regex_mean=r'^T_|^M_', prio='sum', **kwargs):
+                         regex_mean=r'^T_|^M_', prio='sum', level=None,
+                         **kwargs):
         """Resample a multi-indexed DataFrame to a new frequency.
 
         Expects the time column to be at last position in the multi-index.
@@ -1300,6 +1301,9 @@ class DCK_processor(object):
             prioritise that regular expression. If a column fits to one regex,
             the other regex is not checked.
 
+            level (str, optional): The name of a multiindex column level
+            to use for comparison with the regular expressions
+
         kwargs:
             Additional keyword arguments, can be used to pass ``"closed"``
             and/or ``"label"`` (each with the values ``"left"`` or ``"right"``)
@@ -1313,29 +1317,33 @@ class DCK_processor(object):
         cols_mean = []
         cols_found = []
         for column in df.columns:
+            if level is not None and isinstance(df.columns, pd.MultiIndex):
+                column_str = column[df.columns.names.index(level)]
+            else:
+                column_str = column
             if prio == 'sum':
-                if bool(re.search(regex_sum, column)):
+                if bool(re.search(regex_sum, column_str)):
                     cols_sum.append(column)
                     cols_found.append(column)
-                elif bool(re.search(regex_mean, column)):
+                elif bool(re.search(regex_mean, column_str)):
                     cols_mean.append(column)
                     cols_found.append(column)
                 else:
-                    logger.debug('Column "'+column+'" does not match the '
-                                 'regular expressions and is not resampled.')
+                    logger.debug('Column %s does not match the regular '
+                                 'expressions and is not resampled.', column)
             elif prio == 'mean':
-                if bool(re.search(regex_mean, column)):
+                if bool(re.search(regex_mean, column_str)):
                     cols_mean.append(column)
                     cols_found.append(column)
-                elif bool(re.search(regex_sum, column)):
+                elif bool(re.search(regex_sum, column_str)):
                     cols_sum.append(column)
                     cols_found.append(column)
                 else:
-                    logger.debug('Column "'+column+'" does not match the '
-                                 'regular expressions and is not resampled.')
+                    logger.debug('Column %s does not match the regular '
+                                 'expressions and is not resampled.', column)
             else:
                 raise ValueError('Resampling priority setting must be "sum" '
-                                 'or "mean". "'+prio+'" is unknown.')
+                                 'or "mean". "{}" is unknown.'.format(prio))
 
         if len(df.index.names) == 1:
             # If there is only the time column in the index, the resampling
