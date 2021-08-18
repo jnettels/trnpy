@@ -647,8 +647,9 @@ def DataExplorer_open(DatEx_df, data_name='TRNSYS Results', port=80,
 
 def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    tol=0.001, random_state=1, plots_show=False,
-                   plots_dir=r'.\Result', optimizer_pickle=None,
-                   opt_cfg='optimizer.yaml', **skopt_kwargs):
+                   plots_dir=r'.\Result', yscale='linear',
+                   optimizer_pickle=None, opt_cfg='optimizer.yaml',
+                   **skopt_kwargs):
     r"""Perform optimization for a TRNSYS-Simulation with scikit-optimize.
 
     https://scikit-optimize.github.io/#skopt.Optimizer
@@ -703,6 +704,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         plots_dir (str, optional): Directory to save skopt.plots into. If
         ``None``, no plots are saved. Default is ``".\Result"``
 
+        yscale (str, optional): y-axis scale for convergence plot. Options
+        are "linear", "log", "symlog", "logit". Default is 'linear'
+
         optimizer_pickle (str, optional): A path to an optimizer
         instance dumped before with pickle. This allows to continue a
         previous optimization process. Default is ``None``.
@@ -754,6 +758,16 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     import skopt.plots
     import matplotlib as mpl
     import matplotlib.pyplot as plt  # Plotting library
+
+    def plot_save(filepath, dpi=200, transparent=False,
+                  extensions=['.png', '.svg']):
+        """Save plot figures to dífferent file formats."""
+        if not os.path.exists(os.path.dirname(filepath)):
+            os.makedirs(os.path.dirname(filepath))
+
+        for ext in extensions:
+            plt.savefig(filepath+ext, dpi=dpi, bbox_inches='tight',
+                        transparent=transparent)
 
     mpl.rcParams['font.size'] = 5  # Matplotlib setup: For evaluation plots
 
@@ -839,21 +853,31 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                 pass
 
             plots_dir = os.path.abspath(plots_dir)
-            if plots_dir is not None and not os.path.exists(plots_dir):
-                os.makedirs(plots_dir)
-
-            skopt.plots.plot_evaluations(result)
             if plots_dir is not None:
-                plt.savefig(os.path.join(plots_dir, 'skopt_evaluations.png'),
-                            bbox_inches='tight', dpi=200)
-            try:  # plot_objective fails before n_initial_points are done
-                skopt.plots.plot_objective(result)
-            except IndexError:
-                logger.info('Not yet enough data to plot partial dependence.')
-            else:
-                if plots_dir is not None:
-                    plt.savefig(os.path.join(plots_dir, 'skopt_objective.png'),
-                                bbox_inches='tight', dpi=200)
+                try:
+                    skopt.plots.plot_evaluations(result)
+                    plot_save(os.path.join(plots_dir, 'skopt_evaluations'))
+                except OSError as e:
+                    logger.error(e)
+
+                try:  # plot_objective fails before n_initial_points are done
+                    skopt.plots.plot_objective(result)
+                except IndexError:
+                    logger.info(
+                        'Not yet enough data to plot partial dependence.')
+                else:
+                    try:
+                        plot_save(os.path.join(plots_dir, 'skopt_objective'))
+                    except OSError as e:
+                        logger.error(e)
+
+                try:
+                    plt.close('all')
+                    skopt.plots.plot_convergence(result)
+                    plt.yscale(yscale)
+                    plot_save(os.path.join(plots_dir, 'skopt_convergence'))
+                except Exception as e:
+                    logger.error(e)
 
         # A yaml file in the current working directory allows to manipulate
         # the optimization during runtime:
