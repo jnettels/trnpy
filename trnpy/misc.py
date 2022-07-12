@@ -759,6 +759,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     import skopt.plots
     import matplotlib as mpl
     import matplotlib.pyplot as plt  # Plotting library
+    import pickle
 
     def plot_save(filepath, dpi=200, transparent=False,
                   extensions=['.png', '.svg']):
@@ -792,11 +793,14 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             sk_optimizer.space.dimensions[i].name = name
 
     else:
-        # Load an existing optimizer instance from a pickled result object
-        result = skopt.utils.load(optimizer_pickle)
-        sk_optimizer = result.specs['args']['self']
-        logger.info('Optimizer: Loaded existing optimizer results '
-                    + optimizer_pickle)
+        # Load existing optimizer results
+        # result = skopt.load(optimizer_pickle)
+        with open(optimizer_pickle, 'rb') as f:
+            sk_optimizer = pickle.load(f)
+        result = sk_optimizer.get_result()
+
+        logger.info('Optimizer: Loaded existing optimizer results %s',
+                    optimizer_pickle)
 
     # Start the optimization loop
     round_ = 1
@@ -872,6 +876,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                 except IndexError:
                     logger.info(
                         'Not yet enough data to plot partial dependence.')
+                    plt.figure()
                 else:
                     try:
                         plot_save(os.path.join(plots_dir, 'skopt_objective'))
@@ -880,20 +885,42 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
 
                 try:
                     plt.close('all')
-                    skopt.plots.plot_convergence(result)
-                    plt.yscale(yscale)
+                    fig_conv = skopt.plots.plot_convergence(result)
+                    fig_conv.set_yscale(yscale)
                     plot_save(os.path.join(plots_dir, 'skopt_convergence'))
                 except Exception as e:
                     logger.error(e)
 
         # A yaml file in the current working directory allows to manipulate
         # the optimization during runtime:
-        # Change n_cores; set next points; terminate optimizer
+        # Change n_cores and acquisition function arguments, set next points,
+        # terminate optimizer
         try:
             opt_dict = yaml.load(open(opt_cfg, 'r'), Loader=yaml.FullLoader)
 
             # Overwrite number of cores with YAML setting
+            n_cores_last = n_cores
             n_cores = opt_dict.setdefault('n_cores', n_cores)
+            if n_cores_last != n_cores:
+                logger.info('Change number of cores from %s to %s',
+                            n_cores_last, n_cores)
+
+            # Change kappa and xi on the go (exploration vs. exploitation)
+            acq_func_last = sk_optimizer.acq_func
+            sk_optimizer.acq_func = opt_dict.setdefault(
+                'acq_func', sk_optimizer.acq_func)
+            if acq_func_last != sk_optimizer.acq_func:
+                logger.info('Change acquisition function from %s to %s',
+                            acq_func_last, sk_optimizer.acq_func)
+
+            acq_func_kwargs_last = sk_optimizer.acq_func_kwargs
+            sk_optimizer.acq_func_kwargs = opt_dict.setdefault(
+                'acq_func_kwargs', sk_optimizer.acq_func_kwargs)
+            if acq_func_kwargs_last != sk_optimizer.acq_func_kwargs:
+                logger.info('Change acquisition function arguments from %s to '
+                            '%s',
+                            acq_func_kwargs_last, sk_optimizer.acq_func_kwargs)
+            sk_optimizer.update_next()
 
             # Next evaluation points given as user input
             user_ask = opt_dict.setdefault('user_ask', False)  # Boolean
@@ -958,7 +985,13 @@ def convert_user_next_ranges(args_list):
     """
     import itertools
     if len(args_list) > 0:
-        ranges = [range(*items) for items in args_list]
+        # ranges = [range(*items) for items in args_list]
+        ranges = []
+        for items in args_list:
+            if isinstance(items, list):
+                ranges.append(range(*items))
+            else:
+                ranges.append([items])
         combis = list(itertools.product(*ranges))
         return combis
     else:
