@@ -30,6 +30,7 @@ by other modules such as Pandas, Bokeh, Scikit-Optimize and DataExplorer.
 """
 
 import os
+import re
 import logging
 import multiprocessing
 import pandas as pd
@@ -37,10 +38,14 @@ import yaml
 import time
 from collections.abc import Sequence
 from bokeh.command.bootstrap import main
-from bokeh.plotting import figure
-from bokeh.models import HoverTool, ColumnDataSource, RangeTool
-from bokeh.layouts import column
+from bokeh.plotting import figure, output_file, show
+from bokeh.models import ColumnDataSource, HoverTool, RangeTool, Panel, Tabs
+from bokeh.models.widgets import Div
+from bokeh.layouts import layout, column
 from bokeh.palettes import Spectral11 as palette_default
+from bokeh.palettes import viridis
+from bokeh.io import save
+
 
 # Define the logging function
 logger = logging.getLogger(__name__)
@@ -189,6 +194,79 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
             if filter_ in column_ or filter_ == column_:
                 df[column_][mask] = value
                 break  # Break inner for-loop if one filter was matched
+    return df
+
+
+def extract_units_from_df(df, cols_lvl, unit_lvl='Unit'):
+    """Extract unit from df columns and return df with MultiIndex.
+
+    Column names must have the form "column_name_unit". The text after the
+    last underscore is used as a unit.
+
+    df (DataFrame): The DataFrame with columns to extract units from.
+
+    cols_lvl (str): Name of the level containing the column names with units.
+    If columns are not MultiIndex, this name will be given to that level.
+
+    unit_lvl (str, optional): The name of the new level containing the units.
+
+
+    """
+    regex = (r'(?P<name>.+)_(?P<unit>W|kW|MW|kWh|MWh|l|t|kJ|°C|kg/h|%|m/s|°|'
+             r'Pa|W/m²|g/kWh|l/s)$')
+
+    tmy2_units = {
+        'ETR': 'Wh/m²',
+        'ETRN': 'Wh/m²',
+        'GHI': 'Wh/m²',
+        'DNI': 'Wh/m²',
+        'DHI': 'Wh/m²',
+        'GHillum': '100 lux',
+        'DNillum': '100 lux',
+        'DHillum': '100 lux',
+        'Zenithlum': '10 Cd/m²',
+        'TotCld': 'tenths',
+        'OpqCld': 'tenths',
+        'DryBulb': '0.1 °C',
+        'DewPoint': '0.1 °C',
+        'RHum': '%',
+        'Pressure': 'mbar',
+        'Wdir': '°',
+        'Wspd': '0.1 m/s',
+        'Hvis': '0.1 km',
+        'CeilHgt': 'm',
+        'Pwat': 'mm',
+        'AOD': '0.001',
+        'SnowDepth': 'cm',
+        'LastSnowfall': 'days',
+        }
+
+    if not isinstance(df.columns, pd.MultiIndex):
+        df.columns.set_names(cols_lvl, inplace=True)
+
+    rename_dict = dict()
+    unit_list = []
+
+    # Get a match for each column
+    for column_ in df.columns.get_level_values(cols_lvl):
+        match = re.match(pattern=regex, string=column_)
+        if match:
+            name = match.group('name')
+            unit = match.group('unit')
+        elif column_ in tmy2_units.keys():
+            name = column_
+            unit = tmy2_units[column_]
+        else:
+            name = column_
+            unit = '-'
+
+        rename_dict[column_] = name
+        unit_list.append(unit)
+
+    df.rename(columns=rename_dict, level=cols_lvl, inplace=True)
+    idx_new = df.columns.to_frame(index=False)
+    idx_new[unit_lvl] = unit_list
+    df.columns = pd.MultiIndex.from_frame(idx_new)
     return df
 
 
@@ -580,6 +658,379 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
     select.toolbar.active_multi = range_tool
 
     return column(p, select)
+
+
+def create_bokeh_htmls(df_list, files, subfolder='Bokeh', html_show=False,
+                       sizing_mode='stretch_width', **kwargs):
+    """Create interactive HTML files with Bokeh, for each DataFrame.
+
+    Args:
+        df_list (list): List of Pandas DataFrames.
+
+        files (list): List of original filenames.
+
+        subfolder (st, optional): Subfolder for output. Defaults to 'Bokeh'.
+
+        html_show (bool, optional): Automatically open the html file with
+        a webbrowser. Defaults to False.
+
+    Returns:
+        None.
+
+    """
+    for df, file in zip(df_list, files):
+        # Construct the output path
+        filename = os.path.splitext(os.path.basename(file))[0] + '.html'
+        filepath = os.path.join(os.path.dirname(file), subfolder, filename)
+
+        # Create the output folder, if it does not already exist
+        if not os.path.exists(os.path.dirname(filepath)):
+            os.makedirs(os.path.dirname(filepath))
+
+        # Create the output file
+        logger.info('Saving %s', filepath)
+        create_bokeh_html(df, title=os.path.basename(file),
+                          html_filename=filepath, html_show=html_show,
+                          sizing_mode=sizing_mode, **kwargs)
+
+
+def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
+                      html_filename='bokeh.html',
+                      html_show=True, sync_xaxis=True,
+                      sizing_mode='stretch_width',
+                      time_names=['Zeit', 'Time', 'TIME'],
+                      dropna_cols=False,
+                      margin=(0, 9, 0, 0),
+                      **kwargs):
+    """Create a Bokeh html document from a Pandas DataFrame.
+
+    Expects a multiindex in the columns (axis 1), where the levels contain
+    the unit and name for each column. The index of axis 0 is the time.
+
+    Args:
+        df (DataFrame): Pandas DataFrame with timeseries data to be plotted.
+
+        title (str, optional): Title of the html document. Defaults to 'Bokeh'.
+
+        html_show (bool, optional): True: Open html in browser. False: Only
+        save html file to disk. Defaults to True.
+
+        sync_xaxis (bool, optional): Synchronize the x-axis of the plots.
+        This is a nice feature, but impacts performance. Defaults to False.
+
+        dropna_cols (bool, optional): Drop columns that are all NaN.
+
+        tab_grouper (str, optional): Name of an index level by which to group
+        plots into tabs. If None, do not use tabs.
+
+        **kwargs: Other keyword arguments are handed to Bokeh's figure().
+
+    Returns:
+        None.
+
+    """
+    if not os.path.exists(os.path.dirname(html_filename)):
+        os.makedirs(os.path.dirname(html_filename))
+
+    if isinstance(df.index, pd.MultiIndex):
+        # Assume that the first index level is the "hash" that defines
+        # different simulations
+        tab_list = []
+        for _hash in df.index.get_level_values(tab_grouper).unique():
+            df_hash = df.xs(_hash, level=tab_grouper)  # Select current hash
+
+            if dropna_cols:
+                df_hash = df_hash.copy().dropna(axis='columns', how='all')
+
+            # Extrakt the parameters to create a header title in the html
+            title_param_list = []
+            names = df_hash.index.names
+            parameters = [df_hash.index.get_level_values(n)[0] for n in names]
+            for name, param in zip(names, parameters):
+                title_param_list.append('{}={}'.format(name, param))
+            title_param = ', '.join(title_param_list)
+            div = Div(text=title_param)
+
+            # keep only time index
+            for time_name in time_names:
+                if time_name in df_hash.index.names:
+                    time_idx = time_name
+            df_hash.index = df_hash.index.get_level_values(time_idx)
+            # Get the list of figures for the current hash
+            fig_list = create_bokeh_timelines(df_hash, sync_xaxis=sync_xaxis,
+                                              sizing_mode=sizing_mode,
+                                              margin=margin, **kwargs)
+            _column = column([div, *fig_list], sizing_mode=sizing_mode)
+            tab_list.append(Panel(child=_column, title=str(_hash)))
+
+        elements = Tabs(tabs=tab_list)
+    else:
+        elements = create_bokeh_timelines(df, sync_xaxis=sync_xaxis,
+                                          sizing_mode=sizing_mode,
+                                          **kwargs)
+
+    # Define the layout with all elements
+    doc_layout = layout(elements, sizing_mode=sizing_mode)
+    # Create the output file
+    output_file(html_filename, title=title)
+    if html_show:
+        show(doc_layout)  # Trigger opening a browser window with the html
+    else:
+        save(doc_layout)  # Only save the html without showing it
+
+
+def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
+                           unit_lvl=None, sizing_mode='stretch_width',
+                           n_cols_max=15, **kwargs):
+    """Create Bokeh plots from a Pandas DataFrame.
+
+    Args:
+        df (DataFrame): Pandas DataFrame with timeseries data to be plotted.
+
+        sync_xaxis (bool, optional): Synchronize the x-axis of the plots.
+        This is a nice feature, but impacts performance. Defaults to False.
+
+        n_cols_max (int, optional): Limit for number of columns to show
+        within the same figure. Default: 15
+
+        group_lvl (str, optional): Name of a column level by which to group
+        the figures, and use as y-axis label.
+
+        unit_lvl (str, optional): Name of column level that indicates the
+        unit of the values in that column. Columns with the same unit are
+        grouped into figures and labeled, e.g. [°C]
+
+    Returns:
+        None.
+
+    """
+    kwargs.setdefault('plot_height', 350)
+
+    # Determine the type of the x axis
+    if df.index.inferred_type == 'datetime64':
+        x_axis_type = 'datetime'
+    else:
+        x_axis_type = 'linear'
+
+    # For DataFrame with Multiindex, get a list of unique units
+    if group_lvl in df.columns.names:
+        groups = list(df.columns.get_level_values(group_lvl).unique())
+    else:
+        groups = [None]
+
+    if unit_lvl is not None:
+        units = list(df.columns.get_level_values(unit_lvl).unique())
+    else:
+        units = [None]
+
+    # For each DataFrame, create a bokeh figure
+    fig_list = []
+    for group in groups:
+        if group is None:
+            df_group = df
+        else:
+            df_group = df.xs(group, level=group_lvl, axis='columns')
+
+        for unit in units:
+            if unit is None:
+                df_unit = df_group
+            elif unit in df_group.columns.get_level_values(unit_lvl):
+                # Make a cross-selection with the current unit
+                df_unit = df_group.xs(unit, level=unit_lvl, axis='columns')
+            else:
+                continue  # Skip this unit
+            if len(fig_list) > 0:
+                # Synchronize the x_ranges of all subsequent figures to first
+                if sync_xaxis:
+                    fig_link = fig_list[0].children[0]
+            else:
+                fig_link = None
+
+            if group is None and unit is None:
+                y_label = ""
+            elif group is None:
+                y_label = unit
+            elif unit is None:
+                y_label = group
+            else:
+                y_label = '{} [{}]'.format(group, unit)
+
+            # Do not put more than n_cols_max columns into the same figure
+            col_s = 0  # Start column
+            col_e = n_cols_max  # End column
+            while col_e < len(df_unit.columns)+n_cols_max:
+                cols = df_unit.columns[col_s:min(col_e, len(df_unit.columns))]
+                col_s = col_e
+                col_e += n_cols_max
+
+                p = create_bokeh_timeline(
+                    df_unit[cols], fig_link=fig_link, y_label=y_label,
+                    x_axis_type=x_axis_type, sizing_mode=sizing_mode,
+                    **kwargs)
+                fig_list.append(p)
+
+    return fig_list
+
+
+def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
+                          output_backend='canvas', x_axis_type='linear',
+                          sizing_mode='stretch_both', **kwargs):
+    """Create a Bokeh plot from a Pandas DataFrame.
+
+    Args:
+        df (DataFrame): Pandas DataFrame with timeseries data to be plotted.
+
+        fig_link (figure, optional): A Bokeh figure to link the x axis with.
+
+        y_label (str, optional): Label for the y axis (e.g. unit).
+
+        title (str, optional): Plot title.
+
+        output_backend (str, optinal): Bokeh's rendering backend
+        (``"canvas``", ``"webgl"`` or ``"svg"``).
+
+        x_axis_type (str, optional): Type of x axis, 'datetime' or 'linear'.
+
+    Returns:
+        Bokeh 'column' layout object with figures.
+
+    """
+    x_col = df.index.name  # Get name of index (used as x-axis)
+    if x_col is None:
+        logger.debug('No index name found, plot may not show properly!')
+        x_col = 'index'  # The default name that ColumnDataSource will produce
+    source = ColumnDataSource(df)  # Bokeh's internal data structure
+
+    if fig_link is None:  # Set a default range for the x axis
+        fig_x_range = (df.index.min(), df.index.max())
+    else:  # link to the range of the given figure
+        fig_x_range = fig_link.x_range
+
+    kwargs.setdefault('plot_width', 1000)
+    kwargs.setdefault('plot_height', 250)
+    # Create the primary plot figure
+    p = figure(x_axis_type=x_axis_type,
+               x_range=fig_x_range, output_backend=output_backend,
+               title=title, **kwargs)
+
+    # Create the glyphs in the figure (one line plot for each data column)
+    y_cols = list(df.columns)
+    palette = viridis(len(y_cols))  # Generate color palette of correct length
+    for y_col, color in zip(y_cols, palette):
+        try:
+            if not df[y_col].isna().all():
+                if isinstance(y_col, tuple):  # if columns have MultiIndex
+                    y_col = "_" . join(y_col)  # join to match 'source' object
+                r = p.line(x=x_col, y=y_col, source=source, color=color,
+                           name=y_col, legend_label=y_col)
+                # Add a hover tool to the figure
+                add_hover_tool(p, renderers=[r], x_col=x_col,
+                               x_axis_type=x_axis_type)
+        except ValueError:
+            logger.error('Error with column "%s"', y_col)
+            raise
+
+    if all([df[y_col].isna().all() for y_col in y_cols]):
+        return column([p], sizing_mode=sizing_mode)
+    else:
+        custom_bokeh_settings(p)  # Set additional features of the plot
+
+        if y_label is not None:
+            p.yaxis.axis_label = y_label
+
+        select = get_select_RangeTool(p, x_col, y_cols, source, palette,
+                                      output_backend, x_axis_type=x_axis_type)
+
+        return column([p, select], sizing_mode=sizing_mode)
+
+
+def get_select_RangeTool(p, x_col, y_cols, source, palette=viridis(1),
+                         output_backend='canvas', x_axis_type='datetime'):
+    """Return a new figure that uses the RangeTool to control the figure p.
+
+    Args:
+        p (figure): Bokeh figure to control with RangeTool.
+
+        x_col (str): Name of column for x axis.
+
+        y_cols (list): Names of columns for y axis.
+
+        source (ColumnDataSource): Bokeh's data.
+
+        palette (list, optional): Color palette. Defaults to viridis(1).
+
+        output_backend (str, optional): Bokeh's rendering backend. Defaults
+        to 'canvas'.
+
+        x_axis_type (str, optional): Type of x axis, 'datetime' or 'linear'.
+
+    Returns:
+        select (figure): Bokeh figure with a range tool.
+
+    """
+    select = figure(plot_height=45, y_range=p.y_range, tools="",
+                    x_axis_type=x_axis_type, y_axis_type=None,
+                    toolbar_location=None, background_fill_color="#efefef",
+                    output_backend=output_backend,
+                    height_policy="fixed", width_policy="fit",
+                    )
+    for y_col in y_cols:  # Show all lines of primary figure in "select", too
+        if isinstance(y_col, tuple):  # if columns have MultiIndex
+            y_col = "_" . join(y_col)  # join to match 'source' object
+        select.line(x=x_col, y=y_col, source=source)
+
+    # Create a RangeTool, that will be applied to the "select" figure
+    range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
+    range_tool.overlay.fill_color = palette[0]
+    range_tool.overlay.fill_alpha = 0.25
+
+    select.ygrid.grid_line_color = None
+    select.add_tools(range_tool)
+    select.toolbar.active_multi = range_tool
+    return select
+
+
+def custom_bokeh_settings(p):
+    """Define common settings for a Bokeh figure p."""
+    p.outline_line_color = None
+    p.xgrid.grid_line_color = None
+    p.yaxis.major_label_orientation = "vertical"
+    # p.xaxis.major_label_orientation = 1.2
+    if p.legend:
+        # p.legend.background_fill_alpha = 0.5
+        # p.legend.location = "top_left"
+        p.legend.location = "top_right"
+        p.legend.click_policy = "hide"  # clickable legend items
+        p.legend.spacing = -3
+        p.legend.padding = 2
+        p.legend.label_text_font_size = '9pt'
+    p.toolbar.logo = None  # Remove Bokeh logo
+
+
+def add_hover_tool(p, renderers, x_col='TIME', x_axis_type='datetime'):
+    """Add hover tool to a figure p.
+
+    https://docs.bokeh.org/en/latest/docs/user_guide/tools.html#basic-tooltips
+    """
+    for r in renderers:
+        label = r.name
+        if x_axis_type == 'datetime':
+            # This allows to add the x_col as a datetime
+            tooltips = [(label, "@{"+label+"}"),
+                        (x_col, '@{'+x_col+'}{%Y-%m-%d %H:%M %Z}')]
+            formatters = {'@{'+x_col+'}': 'datetime'}
+        else:
+            tooltips = [(label, "@{"+label+"}"),
+                        (x_col, '@{'+x_col+'}')]
+            formatters = {}
+
+        hover = HoverTool(tooltips=tooltips,
+                          renderers=[r],
+                          formatters=formatters,
+                          # mode='vline',  # is irritating with many lines
+                          )
+        p.add_tools(hover)
+
 
 
 def DataExplorer_mark_index(df):
