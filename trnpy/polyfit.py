@@ -33,10 +33,12 @@ These functions are quite experimental and adapted to specific tasks.
 """
 import numpy as np
 import pandas as pd
+import scipy
 import os
 import matplotlib as mpl         # Matplotlib
 import matplotlib.pyplot as plt  # Plotting library
 import logging
+import matplotlib.animation as animation
 
 # Define the logging function
 logger = logging.getLogger(__name__)
@@ -131,6 +133,9 @@ def custom_axis_format(ax):
         mpl.ticker.FuncFormatter(lambda x, p: format(int(x), 'n')))
     ax.xaxis.set_tick_params(rotation=30)  # rotation is useful sometimes
 
+    ax.yaxis.grid(True)
+    ax.set_axisbelow(True)
+
 
 def poly1d_fit_and_plot(
         x, y, c_axis=None, order=2,
@@ -183,11 +188,13 @@ def poly1d_fit_and_plot(
                                c=c_axis, cmap='plasma')
             # paths = ax.scatter(x[1:], y[1:], label=str(len(x)-1)+' Lösungen',
             #                    c=c_axis[1:], cmap='plasma')
-            fig.colorbar(  # regular colorbar
+            cbar = fig.colorbar(  # regular colorbar
                     paths,
                     ax=ax,
                     # fraction=0.046, pad=0.04,
-                    label=z_label)
+                    label=z_label,
+                    )
+            cbar.ax.yaxis.set_major_formatter('{x:n}')
 
             if contour_lines:
                 CS = ax.tricontour(x, y, c_axis, cmap='plasma')
@@ -201,6 +208,7 @@ def poly1d_fit_and_plot(
 
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+    ax.yaxis.set_major_formatter('{x:n}')
     if title is not None:
         ax.set_title(title)
     if limits_xy is not None:
@@ -315,17 +323,21 @@ def poly1d_fit_and_plot(
 
 def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                         title='', nx=20, ny=20, show_plot=True, c_axis=None,
-                        print_formula=False, plot_fit_curve=True,
+                        c_label='', print_formula=False, plot_fit_curve=True,
+                        surface=True, scatter=False, wireframe=False,
+                        plot_scatter_solution=False, limits_xy=None,
+                        plot_solution_stems=False, n_sol=1,
                         savedir=False, savefile='3D-plot.png',
                         savefig_args=dict(), render='mayavi',
                         save_transparent=False, nb_labels=6,
-                        contour_plot_2d=False):
+                        contour_plot_2d=False, animate_rotation=False,
+                        azim=230, elev=20, figsize=(15, 10)):
     r"""Fit given data to a 2-D polynomial of given order.
 
     Plot input data and fittet data. Return a function representing the
     following equation:
 
-    .. math:: p(x,y) = \\sum_{i,j} c_{i,j} * x^i * y^j
+    .. math:: p(x,y) = \sum_{i,j} c_{i,j} * x^i * y^j
 
     3D plotting is done with matplotlib by default. Matplotlib is easier to
     use, but does not visualize intersecting surface appropriately
@@ -345,31 +357,100 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         """
         import matplotlib.colors as mcolors
         cdict = {'red': [], 'green': [], 'blue': []}
+        # seq = seq.reset_index(drop=True)
 
         # make a lin_space with the number of records from seq.
         x = np.linspace(0, 1, len(seq))
 
         for i in range(len(seq)):
             segment = x[i]
-            tone = seq[i]
+            tone = seq.values[i]
             cdict['red'].append([segment, tone, tone*.5])
             cdict['green'].append([segment, tone, tone])
             cdict['blue'].append([segment, tone, tone])
 
         return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
-    if c_axis is None:
-        color_map = cm.plasma
-    else:
-        color_map = make_colormap(c_axis/max(c_axis))
+    # if c_axis is None:
+    color_map = cm.plasma
+    # else:
+    #     color_map = make_colormap(c_axis/max(c_axis))
 
-    # Create 3d plot of input data with matplotlib
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    surf = ax.plot_trisurf(x, y, z, cmap=color_map, linewidth=0,
-                           antialiased=True)
+    if render == 'matplotlib':
+        # Patch for allowing zero margin on z-axis:
+        # https://stackoverflow.com/a/16496436/9067534
+        from mpl_toolkits.mplot3d.axis3d import Axis
+        if not hasattr(Axis, "_get_coord_info_old"):
+            def _get_coord_info_new(self, renderer):
+                mins, maxs, centers, deltas, tc, highs = (
+                    self._get_coord_info_old(renderer))
+                mins += deltas / 4
+                maxs -= deltas / 4
+                return mins, maxs, centers, deltas, tc, highs
+            Axis._get_coord_info_old = Axis._get_coord_info
+            Axis._get_coord_info = _get_coord_info_new
+        # patch end
 
-    if render == 'mayavi':
+        # Create 3d plot of input data with matplotlib
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(projection='3d')
+
+        if wireframe:  # Wireframe plot with scatter colored as c_axis
+            wf = ax.plot_trisurf(x, y, z, linewidth=1, antialiased=True)
+            # turn of surface color, you can control it with alpha here:
+            wf.set_facecolor(mpl.colors.colorConverter.to_rgba('w', alpha=0))
+            # set wire color
+            wf.set_edgecolor('tab:blue')
+
+        if surface:  # "Regular" surface plot
+            surf = ax.plot_trisurf(x, y, z,
+                                   linewidth=0,
+                                   antialiased=True,
+                                   # color='tab:blue',
+                                   # shade=False,
+                                   # cmap=False,
+                                   cmap=color_map,
+                                   )
+        if scatter:
+            scat = ax.scatter3D(x, y, z, s=50, alpha=1, c=c_axis, zorder=101,
+                                cmap='Spectral')
+            if c_axis is not None:
+                # Add a color bar which maps values to colors.
+                cbar = fig.colorbar(scat, ax=ax, shrink=0.5, aspect=5)
+                cbar.set_label(c_label)
+                cbar.ax.yaxis.set_major_formatter('{x:n}')
+
+        if plot_scatter_solution:
+            ax.scatter3D(x[:n_sol], y[:n_sol], z[:n_sol], c='green',
+                         label='Optimum', s=200, zorder=100)
+        if plot_solution_stems:
+            for axis in ['x', 'y', 'z']:
+                markerline, stemline, baseline = ax.stem(
+                    x[:n_sol], y[:n_sol], z[:n_sol], orientation=axis)
+                stemline.set_linestyle('--')
+                stemline.set_color('green')
+                markerline.set_markersize(0)
+
+        # Add annotations
+        ax.text2D(0.01, 0.99, title, transform=ax.transAxes)
+        ax.set_xlabel('\n' + x_label, linespacing=2)
+        ax.set_ylabel('\n' + y_label, linespacing=2)
+        ax.set_zlabel('\n' + z_label, linespacing=2)
+        ax.xaxis.set_major_formatter('{x:n}')
+        ax.yaxis.set_major_formatter('{x:n}')
+        ax.zaxis.set_major_formatter('{x:n}')
+
+        if limits_xy is not None:
+            ax.set_xlim3d(limits_xy[0:2])
+            ax.set_ylim3d(limits_xy[2:4])
+            ax.set_zlim3d(limits_xy[4:6])
+
+        # Set rotation angle to given degrees
+        ax.view_init(azim=azim, elev=elev)
+
+        fig.set_tight_layout(True)
+
+    elif render == 'mayavi':
         # Plotting alternative to matplotlib
         # Axis grid is not yet solved
         # https://stackoverflow.com/questions/54863564/mayavi-how-to-show-the-axes-grid
@@ -472,20 +553,13 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
                               focalpoint='auto', figure=mfig)
         mfig.scene.camera.parallel_scale = parallel_scale
 
-    if c_axis is not None:
-        # Add a color bar which maps values to colors.
-        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
-        # cbar = mlab.colorbar(surf1, orientation='vertical', nb_labels=6)
-        # cbar.label_text_property.color = (0.3, 0.3, 0.3)
-        # cbar.label_text_property.bold = False
-        # cbar.label_text_property.italic = False
-        # cbar.data_range = [0.0, round(z.max(), -len(str(int(z.max())))+1)]
-
-    # Add annotations
-    ax.text2D(0.01, 0.99, title, transform=ax.transAxes)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
-    ax.set_zlabel(z_label)
+        # if c_axis is not None:
+            # Add a color bar which maps values to colors.
+            # cbar = mlab.colorbar(surf1, orientation='vertical', nb_labels=6)
+            # cbar.label_text_property.color = (0.3, 0.3, 0.3)
+            # cbar.label_text_property.bold = False
+            # cbar.label_text_property.italic = False
+            # cbar.data_range = [0.0, round(z.max(), -len(str(int(z.max())))+1)]
 
     if order >= 0 and plot_fit_curve:
         # Fit a 2d polynomial of given order
@@ -500,11 +574,12 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         x_list = [item for sublist in xx for item in sublist]
         y_list = [item for sublist in yy for item in sublist]
         z_list = [item for sublist in zz for item in sublist]
-        ax.set_zlim([z.min()/1.1, z.max()*1.1])
-        surf = ax.plot_trisurf(x_list, y_list, z_list, cmap=cm.viridis,
-                               linewidth=0, antialiased=True, alpha=0.8)
+        if render == 'matplotlib':
+            ax.set_zlim([z.min()/1.1, z.max()*1.1])
+            surf = ax.plot_trisurf(x_list, y_list, z_list, cmap=cm.viridis,
+                                   linewidth=0, antialiased=True, alpha=0.8)
 
-        if render == 'mayavi':
+        elif render == 'mayavi':
             # Add the polyfit to the existing MayaVi figure
             x_conv = np.array(x_list)*ax_scale[0]
             y_conv = np.array(y_list)*ax_scale[1]
@@ -536,20 +611,34 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     if show_plot:
         plt.show()
     if savedir:
-        # Set rotation angle to 30 degrees
-        ax.view_init(azim=230)
-        # fig.savefig(os.path.join(savedir, savefile), **savefig_args)
+        if not os.path.exists(savedir):
+            os.makedirs(savedir)
+        if render == 'matplotlib':
+            fig.savefig(os.path.join(savedir, savefile), **savefig_args)
 
-        if render == 'mayavi':
+            if animate_rotation:
+                def rotate(angle):
+                    ax.view_init(azim=angle, elev=elev)
+                savefile_gif = os.path.join(
+                    savedir, os.path.splitext(savefile)[0] + '.gif')
+                logger.info('Making GIF "%s"', savefile_gif)
+                rot_animation = animation.FuncAnimation(
+                    fig, rotate, frames=np.arange(azim, azim+360, 2), interval=100)
+                rot_animation.save(savefile_gif, dpi=savefig_args.get('dpi', 100))
+                # Set rotation angle to given degrees
+                ax.view_init(azim=azim, elev=elev)
+
+        elif render == 'mayavi':
+            savefile_m = os.path.splitext(savefile)[0] + 'mayavi.png'
             mlab.view(*mlab_view)  # Reset the view to previous settings
             mfig.scene.camera.parallel_scale = parallel_scale
             if save_transparent:
                 mfig.scene._lift()  # required for screenshot()
                 imgmap = mlab.screenshot(figure=mfig, mode='rgba',
                                          antialiased=True)
-                plt.imsave(arr=imgmap, fname=os.path.join(savedir, savefile))
+                plt.imsave(arr=imgmap, fname=os.path.join(savedir, savefile_m))
             else:  # Regular image with background
-                mlab.savefig(os.path.join(savedir, savefile), figure=mfig,
+                mlab.savefig(os.path.join(savedir, savefile_m), figure=mfig,
                              magnification=1)
 
     if print_formula:
@@ -725,7 +814,8 @@ def make_nomograph(func, file):
 
 def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
                  plot_empty=False, contour_tricontour=False,
-                 contour_lines=False, ):
+                 contour_lines=False, n_levels=None,
+                 ):
     """Create matplotlib contour plots along with a colorbar."""
     fig = plt.figure()
     # fig = plt.figure(figsize=(5, 5))
@@ -738,21 +828,28 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
     plt.ylabel(y_label)
 
     # n_levels = np.linspace(0, 0.48, num=49)  # For colorbar
-    n_levels = np.linspace(0, 0.6, num=55)  # For colorbar
+    # n_levels = np.linspace(0, 0.6, num=55)  # For colorbar
     # n_levels = np.linspace(0, 0.6, num=11)  # For colorbar
+    if n_levels is None:
+        n_levels = np.linspace(min(z), max(z), num=11)  # For colorbar
 
     if plot_empty:
-        ax.plot(x, y, 'ko', ms=0, label='Simulationen')  # invisible dots
+        ax.plot(x[:0], y[:0], 'ko', ms=3, label='0 Simulationen')  # invisible dots
         # ax.set_title('%d Simulationen' % len(x))
+
+        plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
 
         # Manualy draw colorbar on empty plot
         cax, _ = mpl.colorbar.make_axes(ax)
         norm = mpl.colors.Normalize(vmin=min(n_levels), vmax=max(n_levels))
-        mpl.colorbar.ColorbarBase(cax, cmap=plt.cm.viridis_r, norm=norm,
-                                  label='Fehler',
-                                  format='%.2f',
-                                  ticks=np.linspace(0, 0.6, num=10),
-                                  )
+        cbar = mpl.colorbar.ColorbarBase(cax, cmap=plt.cm.viridis_r, norm=norm,
+                                          label='Fehler',
+                                          format='%.2f',
+                                          # ticks=np.linspace(0, 0.6, num=10),
+                                          ticks=np.linspace(0, 0.2, num=5),
+                                          # ticks=n_levels,
+                                          )
+        cbar.ax.yaxis.set_major_formatter('{x:n}')  # local format
     else:
         ax.plot(x, y, 'ko', ms=3, label='%d Simulationen' % len(x))
 
@@ -762,22 +859,23 @@ def plot_contour(x, y, z, x_label='', y_label='', z_label='', limits_xy=None,
             plt.clabel(CS, inline=1, fontsize=10)
 
         cntr = ax.tricontourf(x, y, z, levels=n_levels, cmap="viridis_r")
-        fig.colorbar(cntr, label='Fehler',
-                     ax=ax,
-                     format='%.2f',
-                     # fraction=0.046, pad=0.04,
-                     # cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
-                     )  # regular colorbar
+        cbar = fig.colorbar(cntr, label='Fehler', ax=ax, format='%.2f',
+                            # format='%n',
+                            # fraction=0.046, pad=0.04,
+                            # cax = fig.add_axes([1, 0, 0.1, 1])  # TODO
+                            )  # regular colorbar
+        cbar.ax.yaxis.set_major_formatter('{x:n}')  # local format
 
-    plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
+        plt.legend(loc='lower center', ncol=5, bbox_to_anchor=(0.5, 1.0))
 
     return fig, ax
 
 
-def build_gif(df, x, y, savedir, x_label='', y_label='',
+def build_gif(df, x, y, savedir, x_label='', y_label='', z_label='Fehler',
               speed_double=False, speed_test=False, limits_xy=None,
               savefig_args=dict(dpi=100, bbox_inches='tight', pad_inches=0.05,
                                 format='png'),
+              contour_args=dict(),
               ):
     """Create GIF animations.
 
@@ -787,8 +885,13 @@ def build_gif(df, x, y, savedir, x_label='', y_label='',
     import io
     import shutil
 
+    df.sort_index(inplace=True)  # Plot in the order of optimization process
+
     if limits_xy is None:
         limits_xy = (min(df[x]), max(df[x]), min(df[y]), max(df[y]))
+
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
 
     with imageio.get_writer(os.path.join(savedir, '1_contour.gif'),
                             mode='I') as writer:
@@ -805,8 +908,8 @@ def build_gif(df, x, y, savedir, x_label='', y_label='',
                     continue
             fig, ax = plot_contour(df.loc[:i, x], df.loc[:i, y],
                                    df.loc[:i, 'error'], x_label=x_label,
-                                   y_label=y_label, z_label='Fehler',
-                                   limits_xy=limits_xy)
+                                   y_label=y_label, z_label=z_label,
+                                   limits_xy=limits_xy, **contour_args)
             # plt.show()
             buffer = io.BytesIO()
             fig.savefig(buffer, **savefig_args)
@@ -818,15 +921,25 @@ def build_gif(df, x, y, savedir, x_label='', y_label='',
 
         logger.info('GIF finished')
 
-        filename = os.path.join(savedir, '2_contour_gif_end.png')
-        with open(filename, 'wb') as f:
-            buffer.seek(0)
-            shutil.copyfileobj(buffer, f, length=131072)
-            buffer.close()
+        # filename = os.path.join(savedir, '2_contour_gif_end.png')
+        # with open(filename, 'wb') as f:
+        #     buffer.seek(0)
+        #     shutil.copyfileobj(buffer, f, length=131072)
+        #     buffer.close()
 
     # Also create an empty starting plot for the GIF
     fig, ax = plot_contour(df[x], df[y], df['error'], x_label=x_label,
-                           y_label=y_label, z_label='Fehler',
+                           y_label=y_label, z_label=z_label, **contour_args,
                            limits_xy=limits_xy, plot_empty=True)
     filename = os.path.join(savedir, '0_contour_gif_start.png')
+    fig.savefig(filename, **savefig_args)
+    filename = os.path.join(savedir, '0_contour_gif_start.svg')
+    fig.savefig(filename, **savefig_args)
+    # Also create an ending plot for the GIF
+    fig, ax = plot_contour(df[x], df[y], df['error'], x_label=x_label,
+                           y_label=y_label, z_label=z_label, **contour_args,
+                           limits_xy=limits_xy, plot_empty=False)
+    filename = os.path.join(savedir, '2_contour_gif_end.png')
+    fig.savefig(filename, **savefig_args)
+    filename = os.path.join(savedir, '2_contour_gif_end.svg')
     fig.savefig(filename, **savefig_args)
