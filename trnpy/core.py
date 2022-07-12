@@ -37,9 +37,11 @@ import shutil
 import multiprocessing
 import subprocess
 import time
-import pandas as pd
-import psutil
+from collections.abc import Sequence
 import itertools
+import datetime as dt
+import psutil
+import pandas as pd
 
 # Default values that are used by multiple classes:
 regex_result_files_def = r'Result|\.sum|\.pr.|\.plt|\.out'  # result files
@@ -48,7 +50,7 @@ regex_result_files_def = r'Result|\.sum|\.pr.|\.plt|\.out'  # result files
 logger = logging.getLogger(__name__)
 
 
-class TRNExe(object):
+class TRNExe():
     """Define the TRNExe class.
 
     The most prominent function a user will need is ``run_TRNSYS_dck_list()``,
@@ -135,8 +137,8 @@ class TRNExe(object):
         proc = subprocess.Popen([self.path_TRNExe, dck.file_path_dest,
                                  mode_trnsys])
 
-        logger.debug('TRNSYS started with PID ' + str(proc.pid) +
-                     ' ('+dck.file_path_dest+')')
+        logger.debug('TRNSYS started with PID %s (%s)', proc.pid,
+                     dck.file_path_dest)
 
         # Wait until the process is finished
         try:
@@ -145,31 +147,32 @@ class TRNExe(object):
                 if self.TRNExe_is_alive(proc.pid) is False:
                     logger.debug('TRNSYS is inactive and may have encountered '
                                  'an error, killing the process in 10 seconds '
-                                 ': ' + dck.file_path_dest)
+                                 ': %s', dck.file_path_dest)
                     time.sleep(10)
                     proc.terminate()
                     dck.error_msg_list.append('Low CPU load - timeout')
                     dck.success = False
         except KeyboardInterrupt:
             print()
-            logger.critical('Killing TRNSYS process ' + dck.file_path_dest)
+            logger.critical('Killing TRNSYS process %s', dck.file_path_dest)
             proc.terminate()
             proc.wait()
 
         # Check for error messages in the log and store them in the deck object
         if self.check_log_for_errors(dck) is False or dck.success is False:
             dck.success = False
-            logger.debug('Finished PID ' + str(proc.pid) + ' with errors')
+            logger.debug('Finished PID %s with errors', proc.pid)
 
             if self.pause_after_error:  # and not self.mode_exec_parallel:
-                logger.error('Errors in ' + dck.file_path_dest)
+                error_msgs = ''
                 for i, error_msg in enumerate(dck.error_msg_list):
-                    print('  '+str(i)+': '+error_msg)
-                    print('')  # Finish with an empty line
+                    error_msgs += '{}: {}\n'.format(i, error_msg)
+                logger.error('Errors in %s:\n%s', dck.file_path_dest,
+                             error_msgs)
                 input('Press enter key to continue with next simulation.\n')
 
         else:
-            logger.debug('Finished PID ' + str(proc.pid))
+            logger.debug('Finished PID %s', proc.pid)
             dck.success = True
         # Return the deck object
         return dck
@@ -273,14 +276,14 @@ class TRNExe(object):
             if n_cores == 0:
                 n_cores = min(multiprocessing.cpu_count() - 1, len(dck_list))
 
-            logger.info('Parallel processing of ' + str(len(dck_list)) +
-                        ' jobs on ' + str(n_cores) + ' cores')
+            logger.info('Parallel processing of %s jobs on %s cores',
+                        len(dck_list), n_cores)
             pool = multiprocessing.Pool(n_cores)
 
-            """For short lists, imap seemed the fastest option.
-            With imap, the result is a consumable iterator"""
+            # For short lists, imap seemed the fastest option.
+            # With imap, the result is a consumable iterator
             # map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
-            """With starmap_async, the results are available immediately"""
+            # With starmap_async, the results are available immediately
             delay_list = [x*self.delay for x in range(len(dck_list))]
             map_result = pool.starmap_async(self.run_TRNSYS_dck,
                                             zip(dck_list, delay_list))
@@ -296,7 +299,7 @@ class TRNExe(object):
 
         script_time = pd.to_timedelta(time.time() - start_time, unit='s')
         script_time = str(script_time).split('.')[0]
-        logger.info('Finished all simulations in time: %s' % (script_time))
+        logger.info('Finished all simulations in time: %s', script_time)
 
         return returned_dck_list
 
@@ -359,7 +362,7 @@ class TRNExe(object):
         return
 
 
-class DCK(object):
+class DCK():
     """Define the deck class.
 
     Holds all the information about a deck file, including the content of the
@@ -431,9 +434,9 @@ class DCK(object):
 
         if len(self.result_files) == 0:
             logger.warning('No result files were identified among the '
-                           'assigned files in the deck '+self.file_name+'. '
-                           'This may cause issues. Is this regular expression'
-                           ' correct? "'+self.regex_result_files+'"')
+                           'assigned files in the deck %s. This may cause '
+                           'issues. Is this regular expression correct? "%s"',
+                           self.file_name, self.regex_result_files)
 
         # TRNSYS allows to name output files e.g. "***.plt", where the three
         # stars are a placeholder for the deck file name.
@@ -441,8 +444,8 @@ class DCK(object):
             file, n = re.subn(r'\*\*\*', repl=self.file_name, string=file)
             self.result_files[i] = file
             if n > 0:
-                logger.debug('Replaced placeholder "***" with deck file ' +
-                             'name in the assigned file ' + file)
+                logger.debug('Replaced placeholder "***" with deck file '
+                             'name in the assigned file %s', file)
 
     def find_equations(self, iteration=5):
         """Find equations with key and value in the text of the deck file.
@@ -501,7 +504,7 @@ class DCK(object):
         return self.dck_equations
 
 
-class DCK_processor(object):
+class DCK_processor():
     """Define the deck processor class.
 
     Create ``dck`` objects from regular TRNSYS input (deck) files and
@@ -560,8 +563,6 @@ class DCK_processor(object):
         Returns:
             dck_list (list): List of dck objects
         """
-        from collections.abc import Sequence
-
         dck_list = []
         if (isinstance(dck_file_list, Sequence)
            and not isinstance(dck_file_list, str)):
@@ -592,7 +593,7 @@ class DCK_processor(object):
 
         if logger.isEnabledFor(logging.INFO):
             if not parametric_table.empty:
-                logger.info(param_table_file+':')
+                logger.info('%s:', param_table_file)
                 print(parametric_table)
 
         return parametric_table
@@ -648,8 +649,8 @@ class DCK_processor(object):
                              encoding='WINDOWS-1252',  # TRNSYS encoding
                              **kwargs)
         elif filetype in ['.dat', '.txt']:
-            logger.warning('Unsupported file extension: ' + filetype +
-                           '. Trying to read it like a csv file.')
+            logger.warning('Unsupported file extension: %s. Trying to read '
+                           'it like a csv file.', filetype)
             df = pd.read_csv(filepath, **kwargs)
         else:
             raise NotImplementedError('Unsupported file extension: "' +
@@ -737,8 +738,6 @@ class DCK_processor(object):
         Returns:
             None
         """
-        from collections.abc import Sequence
-
         if isinstance(dck, Sequence) and not isinstance(dck, str):
             for dck_obj in dck:  # Call this function recursively for each dck
                 self.add_replacements(replace_dict_new, dck_obj)
@@ -862,12 +861,16 @@ class DCK_processor(object):
         for dck in dck_list:
             # Perform the replacements:
             for re_find, re_replace in dck.regex_dict.items():
-                dck.dck_text, number_of_subs_made = re.subn(re_find,
-                                                            re_replace,
-                                                            dck.dck_text)
+                try:
+                    dck.dck_text, number_of_subs_made = re.subn(re_find,
+                                                                re_replace,
+                                                                dck.dck_text)
+                except Exception:
+                    logger.error('Replace "%s" with "%s"', re_find, re_replace)
+                    raise
                 if number_of_subs_made == 0 and print_warnings:
-                    logger.warning('Replacement not successful, ' +
-                                   'because regex was not found: '+re_find)
+                    logger.warning('Replacement not successful, '
+                                   'because regex was not found: %s', re_find)
 
         return
 
@@ -905,19 +908,18 @@ class DCK_processor(object):
                     try:
                         shutil.copy2(source_file, destination_file)
                     except Exception as ex:
-                        logger.error(dck.file_name + ': Error when trying to '
+                        logger.error('%s: Error when trying to '
                                      'copy an "assigned" file (input data). '
                                      'The simulation may fail. Please check '
                                      'the argument --regex_result_files: '
-                                     '"'+self.regex_result_files+'" '
+                                     '"%s" '
                                      'Is this regular expression correct? It '
-                                     'seperates output from input files.')
+                                     'seperates output from input files.',
+                                     dck.file_name, self.regex_result_files)
                         logger.error(ex)
                 else:
-                    logger.debug(dck.file_name + ': Copy source and ' +
-                                 'destination are equal for file:')
-                    if logger.isEnabledFor(logging.DEBUG):
-                        print(source_file)
+                    logger.debug('%s: Copy source and destination are equal '
+                                 'for file %s', dck.file_name, source_file)
 
             # For result files, we must create the folders
             for file in dck.result_files:
@@ -933,10 +935,10 @@ class DCK_processor(object):
                 f.write(dck.dck_text)
 
         # Print the list of the created & copied parametric deck files
-        logger.debug('List of copied dck files:')
         if logger.isEnabledFor(logging.DEBUG):
-            for dck in dck_list:
-                print(dck.file_path_dest)
+            list_dck_paths = [dck.file_path_dest for dck in dck_list]
+            str_dck_paths = '\n'.join(list_dck_paths)
+            logger.debug('List of copied dck files:\n%s', str_dck_paths)
 
         return
 
@@ -955,10 +957,11 @@ class DCK_processor(object):
         for dck in dck_list:
             if dck.success is False:
                 error_found = True
-                logger.error('Errors in ' + dck.file_path_dest)
+                error_msgs = ''
                 for i, error_msg in enumerate(dck.error_msg_list):
-                    print('  '+str(i)+': '+error_msg)
-                print('')  # Finish with an empty line
+                    error_msgs += '{}: {}\n'.format(i, error_msg)
+                logger.error('Errors in %s:\n%s', dck.file_path_dest,
+                             error_msgs)
 
         if warn and error_found:
             raise RuntimeWarning('Errors found in ' + dck.file_path_dest)
@@ -1050,8 +1053,8 @@ class DCK_processor(object):
                     result_data[result_file] = df
 
                 except Exception as ex:
-                    logger.error('Error when trying to read result file "' +
-                                 result_file + '": ' + str(ex))
+                    logger.error('Error when trying to read result file "%s"'
+                                 ': %s', result_file, ex)
 
             if logger.isEnabledFor(logging.INFO):  # Print progress
                 frac = i/len(dck_list)*100
@@ -1119,12 +1122,10 @@ class DCK_processor(object):
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         """
-        import datetime
-
         if origin is None:  # Create default datetime object
-            date = datetime.datetime.today().replace(month=1, day=1)
-            time = datetime.time(hour=0)
-            origin = datetime.datetime.combine(date, time)
+            date = dt.datetime.today().replace(month=1, day=1)
+            time_obj = dt.time(hour=0)
+            origin = dt.datetime.combine(date, time_obj)
         else:
             origin = pd.Timestamp(origin)  # Convert string to datetime object
 
@@ -1180,14 +1181,14 @@ class DCK_processor(object):
 
                     # Copy the date range for each simulation
                     dr_copy = dr.copy()
-                    for n in range(n_sim - 1):
+                    for _ in range(n_sim - 1):
                         dr_copy = dr_copy.append(dr)
                     df[t_col] = dr_copy  # Insert date range into the DataFrame
 
                 except Exception as ex:
                     logger.exception(ex)
                     logger.critical('Creating datetime index without removing '
-                                    + 'leap year days.')
+                                    'leap year days.')
 
                     # Safe way of converting the float TIME column to datetime.
                     # However, this creates a 29.2. in all leap years
@@ -1263,10 +1264,9 @@ class DCK_processor(object):
             df_new = df.loc[slices, :]  # Slice multiindex
 
         if len(df_new.index) == 0:
-            logger.error('After slicing from '+str(start)+' to '+str(end)
-                         + ', data is empty! Returning original data, which '
-                         + 'ranges from '
-                         + str(df.index.min())+' to '+str(df.index.max()))
+            logger.error('After slicing from %s to %s, data is empty! '
+                         'Returning original data, which ranges from %s to %s',
+                         start, end, df.index.min(), df.index.max())
             return df
 
         return df_new

@@ -125,40 +125,38 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
 
     if isinstance(df, Sequence) and not isinstance(df, str):
         # Save a list of DataFrame objects into a single Excel file
-        writer = pd.ExcelWriter(path)
-        for i, df_ in enumerate(df):
-            try:  # Use given sheet name, or just an enumeration
-                sheet = str(sheet_names[i])
-            except IndexError:
-                sheet = str(i)
+        with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
+            for i, df_ in enumerate(df):
+                try:  # Use given sheet name, or just an enumeration
+                    sheet = str(sheet_names[i])
+                except IndexError:
+                    sheet = str(i)
 
-            # Add current sheet to the ExcelWriter by calling this
-            # function recursively
-            df_to_excel(df=df_, path=writer, sheet_name=sheet,
-                        merge_cells=merge_cells, **kwargs)
+                # Add current sheet to the ExcelWriter by calling this
+                # function recursively
+                df_to_excel(df=df_, path=writer, sheet_name=sheet,
+                            merge_cells=merge_cells, **kwargs)
 
-            # Try adding format styles to the workbook sheets
-            if len(styles) > 0:
-                try:
-                    workbook = writer.book
-                    worksheet = writer.sheets[sheet]
-                    formats = styles[i]['formats']
-                    wb_formats = dict()
-                    for fmt_name, format_ in formats.items():
-                        # Example: format_ = {'num_format': '0%'}
-                        wb_formats[fmt_name] = workbook.add_format(format_)
+                # Try adding format styles to the workbook sheets
+                if len(styles) > 0:
+                    try:
+                        workbook = writer.book
+                        worksheet = writer.sheets[sheet]
+                        formats = styles[i]['formats']
+                        wb_formats = dict()
+                        for fmt_name, format_ in formats.items():
+                            # Example: format_ = {'num_format': '0%'}
+                            wb_formats[fmt_name] = workbook.add_format(format_)
 
-                    columns = styles[i]['columns']
-                    widths = styles[i]['widths']
-                    for col, fmt_name in columns.items():
-                        # Set the format and width of the column
-                        worksheet.set_column(col, widths[fmt_name],
-                                             wb_formats[fmt_name])
-                except Exception as ex:
-                    logger.exception(ex)
-                    pass
-
-        writer.save()  # Save the actual Excel file
+                        columns = styles[i]['columns']
+                        widths = styles[i]['widths']
+                        for col, fmt_name in columns.items():
+                            # Set the format and width of the column
+                            worksheet.set_column(col, widths[fmt_name],
+                                                 wb_formats[fmt_name])
+                    except Exception as ex:
+                        logger.exception(ex)
+                        pass
 
     else:
         # Per default, the sheet cells are frozen to keep the index visible
@@ -652,7 +650,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                    **skopt_kwargs):
     r"""Perform optimization for a TRNSYS-Simulation with scikit-optimize.
 
-    https://scikit-optimize.github.io/#skopt.Optimizer
+    https://scikit-optimize.github.io/stable/modules/generated/skopt.Optimizer.html#skopt.Optimizer
 
     The "ask and tell" API of scikit-optimize exposes functionality that
     allows to obtain multiple points for evaluation in parallel. Intended
@@ -673,6 +671,9 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     This function implements the description above, except for step "3.
     Evaluate points". A function ``eval_func`` for this has to be
     provided by the user.
+
+    More important information:
+    https://scikit-optimize.github.io/stable/auto_examples/exploration-vs-exploitation.html#sphx-glr-auto-examples-exploration-vs-exploitation-py
 
     Args:
         eval_func (function): Evaluation function. Must take a
@@ -732,7 +733,7 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
               - `"lhs"` for a latin hypercube sequence,
               - `"grid"` for a uniform grid sequence
 
-            * See more: https://scikit-optimize.github.io/#skopt.Optimizer
+            * See more: https://scikit-optimize.github.io/stable/modules/generated/skopt.Optimizer.html#skopt.Optimizer
 
     Returns:
         opt_res (OptimizeResult, scipy object): The optimization result
@@ -766,8 +767,11 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
             os.makedirs(os.path.dirname(filepath))
 
         for ext in extensions:
-            plt.savefig(filepath+ext, dpi=dpi, bbox_inches='tight',
-                        transparent=transparent)
+            try:
+                plt.savefig(filepath+ext, dpi=dpi, bbox_inches='tight',
+                            transparent=transparent)
+            except Exception as e:
+                logger.error(e)
 
     mpl.rcParams['font.size'] = 5  # Matplotlib setup: For evaluation plots
 
@@ -802,12 +806,12 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     eval_func_kwargs = dict()
 
     while count < n_calls:
-        logger.info('Optimizer: Starting iteration round {} ({} of {} '
-                    'simulations done)'.format(round_, count, n_calls))
+        logger.info('Optimizer: Starting iteration round %s (%s of %s '
+                    'simulations done)', round_, count, n_calls)
 
         if user_ask and len(user_next_x) > 0:
             next_x = user_next_x
-            logger.info('Simulating this round with user input: '+str(next_x))
+            logger.info('Simulating this round with user input: %s', next_x)
 
         else:
             try:  # get points to evaluate
@@ -842,8 +846,11 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
         if plots_dir is not None and not os.path.exists(plots_dir):
             os.makedirs(plots_dir)
         if plots_dir is not None:
-            skopt.utils.dump(result, os.path.join(plots_dir, 'optimizer.pkl'),
-                             store_objective=True)
+            # skopt.utils.dump(result,
+            #                  os.path.join(plots_dir, 'optimizer.pkl'),
+            #                  store_objective=True)
+            with open(os.path.join(plots_dir, 'optimizer.pkl'), 'wb') as f:
+                pickle.dump(sk_optimizer, f)
 
         # Generate and save optimization result plots:
         if result.space.n_dims > 1:
@@ -919,15 +926,15 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
                       default_flow_style=None)
 
             if kill:
-                logger.critical('Optimizer: Killed by file '+opt_cfg)
+                logger.critical('Optimizer: Killed by file %s', opt_cfg)
                 break
         except Exception:
             pass
 
-    logger.info('Optimizer: Best fit after '+str(count)+' simulations: '
-                + str(result.fun) + '\n'
-                + pd.Series(data=result.x,
-                            index=result.space.dimension_names).to_string()
+    logger.info('Optimizer: Best fit after %s simulations: %s\n%s',
+                count, result.fun,
+                pd.Series(data=result.x,
+                          index=result.space.dimension_names).to_string()
                 )
 
     if result.space.n_dims > 1:
