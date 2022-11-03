@@ -1137,8 +1137,9 @@ class DCK_processor():
 
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None, store_success=True, store_hours=True,
-                        remove_leap_year=True):
-        """Collect the results of the simulations.
+                        remove_leap_year=True, time_label_left=False,
+                        keep_only_last_year=False):
+        r"""Collect the results of the simulations.
 
         Combine the result files of the parametric runs into DataFrames. They
         contain the raw data plus columns for each of the replacements made
@@ -1165,6 +1166,16 @@ class DCK_processor():
             for read_filetypes() for info about passing over additional
             arguments to customize it to your needs.
 
+        A useful example code to process the results into one DataFrame.
+
+        .. code:: python
+
+            # Extract "group" names from the file names and create MultiIndex
+            reg = r'Result\\(.*)\.(?:out|dat|sum)'
+            files = [re.findall(reg, key)[0] for key in result_data.keys()]
+            df = pd.concat(result_data.values(), axis='columns', keys=files)
+            df.columns.set_names(['Group', 'Sensor'], inplace=True)
+
         Args:
             dck_list (list): A list of DCK objects
 
@@ -1185,6 +1196,17 @@ class DCK_processor():
 
             remove_leap_year (bool, optional): Try to remove February 29 from
             leap years. Default: True
+
+            time_label_left (bool, optional): If true, label each time step
+            on the left. By default, each time step is labelled on the right.
+            For example, the first simulated hour may be labelled
+            2022-01-01 00:00 (left) or 2022-01-01 01:00 (right).
+            'right' is more in line with traditional labelling of weather data,
+            while 'left' makes handling of the data with pandas easier.
+
+            keep_only_last_year (bool, optional): If True, only the results
+            from the last 8760 hours of the simulation results are kept.
+            Default: False
 
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
@@ -1236,13 +1258,27 @@ class DCK_processor():
             result_data = self.results_create_index(
                 result_data, replace_dict=dck_list[0].replace_dict,
                 origin=origin, store_hours=store_hours,
-                remove_leap_year=remove_leap_year)
+                remove_leap_year=remove_leap_year,
+                time_label_left=time_label_left,
+                keep_only_last_year=keep_only_last_year)
+
+        for file, df in result_data.items():
+            for column in df.columns:
+                if column == 'success':
+                    continue
+                if df[column].dtype == 'object':
+                    logger.error(
+                        'Column "{}" in file "{}" has dtype object. '
+                        'This may be caused by extremely small numbers '
+                        'like 1.234E-100 that TRNSYS writes as 1.234-100.'
+                        .format(column, file))
 
         return result_data
 
     def results_create_index(self, result_data, replace_dict={}, origin=None,
                              time_names=['TIME', 'Time', 'Period'],
-                             store_hours=True, remove_leap_year=True):
+                             store_hours=True, remove_leap_year=True,
+                             time_label_left=False, keep_only_last_year=False):
         """Put the time and parameter columns into the index of the DataFrame.
 
         The function expects the return of ``results_collect()``. This
@@ -1286,6 +1322,13 @@ class DCK_processor():
             remove_leap_year (bool, optional): Try to remove February 29 from
             leap years. Default: True
 
+            time_label_left (bool, optional): If true, label each time step
+            on the left. By default, each time step is labelled on the right.
+
+            keep_only_last_year (bool, optional): If True, only the results
+            from the last 8760 hours of the simulation results are kept.
+            Default: False
+
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         """
@@ -1308,11 +1351,26 @@ class DCK_processor():
             if store_hours:
                 df['HOURS'] = df[t_col]  # Store the float hours
 
+            if time_label_left and df[t_col][0] > 0:
+                df[t_col] = df[t_col] - df[t_col][0]
+
             # Determine frequency as float, string and TimeDelta
             freq_float = df[t_col][1] - df[t_col][0]
             freq_str = str(freq_float)
             time_index = pd.to_datetime(df[t_col], unit='h', origin=origin)
             freq_timedelta = time_index[1] - time_index[0]
+
+            if keep_only_last_year:
+                keep_steps = int(8760 / freq_float)
+                df.set_index(keys=['hash'], inplace=True)
+                df_list = []
+                for hash_ in df.index.get_level_values('hash').unique():
+                    df_hash = df.xs(hash_, drop_level=False)
+                    df_hash = df_hash[-keep_steps:]
+                    df_hash.reset_index(inplace=True)
+                    df_hash[t_col] = df_hash[t_col] - df_hash[t_col][0]
+                    df_list.append(df_hash)
+                df = pd.concat(df_list)
 
             # Convert the TIME float column to the datetime format
             if not remove_leap_year:
@@ -1341,8 +1399,12 @@ class DCK_processor():
 
                     # Create date range, with the correct start and end date
                     end_date = origin.replace(year=origin.year + n_years)
-                    dr = pd.date_range(start=origin + freq_timedelta,
-                                       end=end_date, freq=freq_str+'H')
+                    if time_label_left is False:
+                        dr = pd.date_range(start=origin + freq_timedelta,
+                                           end=end_date, freq=freq_str+'H')
+                    else:
+                        dr = pd.date_range(start=origin, freq=freq_str+'H',
+                                           end=end_date - freq_timedelta)
                     # Remove leap year days from the date range
                     dr = dr[~((dr.month == 2) & (dr.day == 29))]
 
@@ -1400,6 +1462,8 @@ class DCK_processor():
                 if remove_leap_year:
                     logger.warning(
                         key+': Data has leap years '+', '.join(years))
+
+            result_data[key] = df  # df is not modified in place
 
         return result_data
 
