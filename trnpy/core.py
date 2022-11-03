@@ -274,7 +274,8 @@ class TRNExe():
         if self.mode_exec_parallel:
             n_cores = self.n_cores
             if n_cores == 0:
-                n_cores = min(multiprocessing.cpu_count() - 1, len(dck_list))
+                n_cores = max(
+                    1,  min(multiprocessing.cpu_count() - 1, len(dck_list)))
 
             logger.info('Parallel processing of %s jobs on %s cores',
                         len(dck_list), n_cores)
