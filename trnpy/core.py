@@ -286,6 +286,8 @@ class TRNExe():
             # map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
             # With starmap_async, the results are available immediately
             delay_list = [x*self.delay for x in range(len(dck_list))]
+            # After the first n_cores simulations, no delay is needed
+            delay_list[n_cores:] = [0] * len(delay_list[n_cores:])
             map_result = pool.starmap_async(self.run_TRNSYS_dck,
                                             zip(dck_list, delay_list))
 
