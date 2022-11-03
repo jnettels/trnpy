@@ -482,7 +482,7 @@ class DCK():
                 logger.debug('Replaced placeholder "***" with deck file '
                              'name in the assigned file %s', file)
 
-    def find_equations(self, iteration=5):
+    def find_equations(self, iteration=10, iteration_max=10):
         """Find equations with key and value in the text of the deck file.
 
         Fill and return a dictionary with the results.
@@ -491,17 +491,84 @@ class DCK():
         into floats.
 
         Args:
-            None
+            iteration (int): Number of the current iteration
+
+            iteration_max (int): The maximum number of iterations. If changed,
+            the start value of iteration must match this.
 
         Returns:
             dck_equations (dict): Key, value pairs of equations in dck_text
         """
-        if iteration >= 5:  # Only find equations in the first iteration
+        def gt(x, y):
+            """Define custom TRNSYS function 'greater than'."""
+            if x > y:
+                return 1
+            else:
+                return 0
+
+        def ge(x, y):
+            """Define custom TRNSYS function 'greater or equal'."""
+            if x >= y:
+                return 1
+            else:
+                return 0
+
+        def lt(x, y):
+            """Define custom TRNSYS function 'lower than'."""
+            if x < y:
+                return 1
+            else:
+                return 0
+
+        def le(x, y):
+            """Define custom TRNSYS function 'lower or equal'."""
+            if x <= y:
+                return 1
+            else:
+                return 0
+
+        def eql(x, y):
+            """Define custom TRNSYS function 'equal'."""
+            if x == y:
+                return 1
+            else:
+                return 0
+
+        def custom_not(x):
+            """Define custom function to replace TRNSYS function 'not'."""
+            if x == 1:
+                return 0
+            else:
+                return 1
+
+        def custom_and(x, y):
+            """Define custom function to replace TRNSYS function 'and'."""
+            if x and y:
+                return 1
+            else:
+                return 0
+
+        def custom_or(x, y):
+            """Define custom function to replace TRNSYS function 'or'."""
+            if x or y:
+                return 1
+            else:
+                return 0
+
+        if iteration >= iteration_max:
+            # Only find equations in the first iteration
             re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
 
             match_list = re.findall(re_find, self.dck_text)
             if match_list:  # Matches of the regular expression were found
                 for key, value in match_list:
+
+                    # Some functions need a replacement to work with "eval()"
+                    value = value.replace("not(", "custom_not(")
+                    value = value.replace("and(", "custom_and(")
+                    value = value.replace("or(", "custom_or(")
+                    value = value.replace("^", "**")
+
                     try:  # Try to convert the string to a float
                         self.dck_equations[key] = float(value)
                     except Exception:
