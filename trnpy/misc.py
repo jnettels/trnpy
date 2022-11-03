@@ -37,14 +37,16 @@ import pandas as pd
 import yaml
 import time
 from collections.abc import Sequence
+from pandas.tseries.frequencies import to_offset
 from bokeh.command.bootstrap import main
 from bokeh.plotting import figure, output_file, show
 from bokeh.models import ColumnDataSource, HoverTool, RangeTool, Panel, Tabs
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, column
+from bokeh.layouts import layout, column, gridplot
 from bokeh.palettes import Spectral11 as palette_default
 from bokeh.palettes import viridis
 from bokeh.io import save
+import matplotlib.pyplot as plt
 
 
 # Define the logging function
@@ -1032,7 +1034,6 @@ def add_hover_tool(p, renderers, x_col='TIME', x_axis_type='datetime'):
         p.add_tools(hover)
 
 
-
 def DataExplorer_mark_index(df):
     """Put '!' in front of index column names.
 
@@ -1447,6 +1448,741 @@ def convert_user_next_ranges(args_list):
         return combis
     else:
         return []
+
+
+def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
+                project="Project", decimals=0, time_lvl='TIME',
+                near_zero=1e-2, export_title=True,
+                width=1400, height=600):
+    """Plot sankey diagram for simulation results."""
+    import holoviews_sankey  # unpublished custom library
+
+    logger.debug('Plot Sankey simulation %s', sim)
+
+    if isinstance(df.index, pd.MultiIndex):
+        hash_list = df.index.get_level_values('hash').unique()
+        df_list = [df.xs(_hash, drop_level=False) for _hash in hash_list]
+        show_single_plot = False
+    else:
+        hash_list = ['']
+        df_list = [df]
+        show_single_plot = True
+
+    title_html = '{} {}'.format(project, sim)
+    sankey_list = []
+    edges_list = []
+    for df_hash, _hash in zip(df_list, hash_list):
+        if _hash != '':
+            _hash = ' {}'.format(_hash)  # Add whitespace before
+
+        for year in df_hash.index.get_level_values(level=time_lvl):
+            df_year = df_hash.xs(year, level=time_lvl, drop_level=False)
+            if isinstance(year, pd.Timestamp):
+                year_int = year.year
+            else:
+                year_int = year
+
+            edges = prepare_sankey_edges(df_year, edges_str)
+
+            edges_plot = edges[edges['Value'] > near_zero]
+
+            filename_sankey = os.path.join(
+                path_sankey,
+                '{} Sankey {}{} {}' .format(project, sim, _hash, year_int))
+            if not os.path.exists(os.path.dirname(filename_sankey)):
+                os.makedirs(os.path.dirname(filename_sankey))
+
+            title = '{} {} (MWh/a)'.format(project, sim)
+
+            names = df_year.index.names
+            params = [df_year.index.get_level_values(n)[0] for n in names]
+            for name, param in zip(names, params):
+                title += ', {}={}'.format(name, param)
+
+            bkplot = holoviews_sankey.create_and_save_sankey(
+                edges_plot,
+                show_plot=show_single_plot,
+                title=title,
+                title_html=title_html,
+                filename=filename_sankey,
+                unit='MWh',
+                decimals=decimals,
+                label_text_font_size='9pt',
+                node_width=20,
+                toolbar_location=None,
+                export_title=export_title,
+                width=width, height=height,
+                )
+
+            sankey_list.append(bkplot)
+
+            df_edges = edges.set_index(['From', 'To'], append=True)
+            df_edges = df_edges.T.set_index(df_year.index, append=True).T
+            edges_list.append(df_edges)
+
+    doc_layout = gridplot(sankey_list, ncols=1, sizing_mode='stretch_width')
+    # Create the output file
+    filename_sankey = os.path.join(path_sankey,
+                                   '{} {}'.format(project, sim))
+    output_file(filename_sankey + '.html', title=title_html)
+
+    if html_show:
+        show(doc_layout)  # Trigger opening a browser window with the html
+    else:
+        save(doc_layout)  # Only save the html without showing it
+
+    if len(edges_list) > 0:
+        # Print one Excel file with all Sankey values
+        names = [str(_hash) for _hash in hash_list]
+
+        edges_combined = pd.concat(edges_list, axis='columns')
+        edges_list_2 = [edges_combined.xs(h, level='hash', axis='columns',
+                                          drop_level=False) for h in hash_list]
+
+        df_to_excel(
+            df=edges_list_2+[edges_combined], sheet_names=names+['combined'],
+            path=filename_sankey+'.xlsx',
+            merge_cells=True)
+    else:
+        edges_list[0].to_excel(filename_sankey+'.xlsx')
+    return None
+
+
+def prepare_sankey_edges(df, edges_str):
+    """Prepare the edges DataFrame for the Sankey plot.
+
+    Get the strings of the columns as input and try to access the
+    actual values. Deals with missing values and performs unit conversion.
+    """
+    edges = edges_str[['From', 'To']]  # Copy of string df for floats
+    edges['Value'] = float('NaN')
+
+    for idx in edges_str.index:
+        _column = edges_str.loc[idx, 'Value']
+        if _column in df.columns:
+            value = df[_column].sum()
+            if _column.endswith('_W'):
+                value *= 1/1000000
+            elif _column.endswith('_kW'):
+                value *= 1/1000
+            elif _column.endswith('_kWh'):
+                value *= 1/1000
+            if value < 0:
+                logger.error('Value {} of column {} is negative, this '
+                             'will result in broken sankey diagram'
+                             .format(value, _column))
+            try:
+                edges.loc[idx, 'Value'] = value
+            except ValueError:
+                logger.error(value)
+                breakpoint()
+                raise
+        else:  # Do not crash the script if a column is missing
+            edges.loc[idx, 'Value'] = float('NaN')
+            logger.warning('Missing in sankey: %s', _column)
+
+    return edges
+
+
+def replace_kJ_with_MWh(df, name_lvl=None):
+    """Convert units from kJ to MWh and rename the columns accordingly.
+
+    Rename columns that end with '_kJ' to '_MWh'.
+    """
+    if isinstance(df.columns, pd.MultiIndex) and name_lvl is None:
+        raise ValueError("Name of the MultiIndex level required.")
+
+    # Rename the column
+    if name_lvl is None:
+        df_columns = df.columns.to_series()
+        df_columns.replace('_kJ$', '_MWh', inplace=True, regex=True)
+        idx = df_columns.str.endswith('_MWh')
+        df.columns = pd.Index(df_columns)
+    else:
+        df_columns = df.columns.to_frame(index=False)
+        df_columns[name_lvl].replace('_kJ$', '_MWh', inplace=True, regex=True)
+        idx = df_columns[name_lvl].str.endswith('_MWh')
+        df.columns = pd.MultiIndex.from_frame(df_columns)
+
+    # Apply the unit conversion to the selected columns
+    df.loc[:, df.columns[idx]] *= (1/3600000)  # From kJ to MWh
+
+    return df
+
+
+def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
+                     replace_zero_with_nan=False):
+    """Create new column name E_*_MWh from P_*_kW."""
+    freq = pd.Timedelta(to_offset(pd.infer_freq(
+            df.iloc[0:3].index.get_level_values(time_lvl)))
+            ) / pd.Timedelta('1 hours')
+
+    if name_lvl is None:
+        idx = df.columns.to_series().str.endswith('_MWh')
+    else:
+        df_columns = df.columns.to_frame(index=False)
+        idx = df_columns[name_lvl].str.endswith('_MWh')
+        name_lvl_i = df.columns.names.index(name_lvl)
+
+    for energy_col in df.loc[:, df.columns[idx]]:
+
+        if name_lvl is None:
+            energy = energy_col
+        else:
+            energy = energy_col[name_lvl_i]
+
+        power = re.sub(r'^E_(.+)_MWh', r'P_\1_kW', energy)
+
+        if name_lvl is None:
+            power_col = power
+        else:
+            power_col = list(energy_col)  # convert tuple to list
+            power_col[name_lvl_i] = power
+            power_col = tuple(power_col)
+
+        # Create new column name E_*_MWh from P_*_kW
+        df[power_col] = df[energy_col] * 1000 / freq  # MWh to kW
+
+        if replace_zero_with_nan:
+            df[power_col].replace(0, float('NaN'), inplace=True)
+
+    return df
+
+
+def get_sim_properties(dck_list, df=None, drop_expressions=True):
+    """Get a DataFrame with the simulation deck properties.
+
+    Trnpy provides a function dck.find_equations() to get the contents
+    of all equations in a TRNSYS deck. This allows easy access to e.g.
+    the installed capacity of a component.
+
+    Args:
+        df (DataFrame, optional):
+        If argument df is None, the returned DataFrame contains one row for
+        each hash in the list of simulated decks.
+        If df is defined, the returend DataFrame will have the same index as
+        df. This is useful if the simulation results have been resampled to
+        annual sums and now the DataFrame of properties is needed for
+        calculations with the annual DataFrame.
+
+        drop_expressions (bool, optional):
+        If true, all expressions that cannot be resolved to a numerical value
+        will be dropped. This includes e.g. all equations that reference
+        "linked" values, instead of referencing values by name.
+
+    Returns:
+        df_props (DataFrame): DataFrame with simulation properties
+
+    """
+    df_props = pd.DataFrame(
+        data=[dck.find_equations() for dck in dck_list],
+        index=pd.Index(data=[dck.hash for dck in dck_list], name='hash'))
+
+    if drop_expressions:
+        for col in df_props.columns:
+            df_props[col] = pd.to_numeric(df_props[col], errors='coerce')
+        df_props.dropna(axis='columns', how='all', inplace=True)
+
+    if df is not None:
+        df_props = pd.merge(pd.DataFrame(index=df.index), df_props,
+                            left_index=True, right_index=True)
+    return df_props
+
+
+def keeplevel(df, levels, axis=0):
+    """Opposite function of droplevel."""
+    df = df.droplevel(df.axes[axis].droplevel(levels).names, axis=axis)
+    return df
+
+
+def label_group_bar_table(ax, df, label_names=True,
+                          rot_top_level=0):
+    """Create the x-axis label for grouped bar charts."""
+    from itertools import groupby
+
+    def add_line(ax, xpos, ypos):
+        line = plt.Line2D([xpos, xpos], [ypos + .1, ypos],
+                          linewidth=0.6,
+                          transform=ax.transAxes, color='gray')
+        line.set_clip_on(False)
+        ax.add_line(line)
+
+    def label_len(my_index, level):
+        labels = my_index.get_level_values(level)
+        return [(k, sum(1 for i in g)) for k, g in groupby(labels)]
+
+    ypos = -0.1
+    scale = 1.0/df.index.size
+    for level in range(df.index.nlevels)[::-1]:
+        pos = 0
+        if level == df.index.nlevels-1:  # Define rotation for top level
+            rotation = rot_top_level
+        else:
+            rotation = 0
+
+        if label_names:
+            # Add the name of the current level below the y-axis
+            name = df.index.names[level]
+            ax.text(-0.01, ypos+0.01, name, ha='right', transform=ax.transAxes)
+        # Add the level values
+        for label, rpos in label_len(df.index, level):
+            lxpos = (pos + .5 * rpos)*scale
+            ax.text(lxpos, ypos+0.01, label, ha='center',
+                    transform=ax.transAxes, rotation=rotation)
+            add_line(ax, pos*scale, ypos)
+            pos += rpos
+        add_line(ax, pos*scale, ypos)
+        ypos -= .1
+
+    # We are replacing the original x labels
+    ax.set_xticklabels('')
+    ax.set_xlabel('')
+
+
+def autolabel(ax, rects, float_format='{:.2f}', df=None, **kwargs):
+    """Attach a text label above each bar in *rects*, displaying its height.
+
+    Addtional kwargs can be used e.g. for:
+        - rotation=0
+        - fontsize='small'
+
+    """
+    try:
+        for i, rect in enumerate(rects):
+            for x, y in rect.get_xydata():
+                if df is not None:
+                    txt = float_format.format(df.iloc[int(x)])
+                else:
+                    txt = float_format.format(y)  # regular float with dot
+
+                # txt = txt.replace('.', ',')  # enforce
+
+                ax.annotate(txt,
+                            xy=(x, y),
+                            xytext=(2, 10),
+                            textcoords="offset points",
+                            # arrowprops=dict(arrowstyle="-",
+                            #                 color='gray',
+                            #                 connectionstyle="arc3",
+                            #                 ),
+                            ha='center', va='bottom', **kwargs)
+    except Exception as ex:
+        logger.error(ex)
+
+
+def custom_plot_save(filename, folder='Plots', dpi=750,
+                     transparent=False, extensions=['.png', '.svg']):
+    """Save plot figures to different file formats."""
+    filepath = os.path.join(folder, filename)
+    if not os.path.exists(os.path.dirname(filepath)):
+        os.makedirs(os.path.dirname(filepath))
+
+    for ext in extensions:
+        plt.savefig(filepath+ext, dpi=dpi, bbox_inches='tight',
+                    transparent=transparent)
+
+
+def plot_barchart_multiindex(
+        df, y_list, y_label_list=[], y_label='', idx_lvl=None,
+        idx_lvl_labels=None, title='', sum_col=None, sum_label=None,
+        sum_rot=45, sum_fontsize='small', label_dict=None, hash_dict=None,
+        sum_color=None, marker='o', markersize=5, linewidth=0, stacked=True,
+        figsize=(8.8, 5), ylim=None, legend_ncol=5, stay_positive=False,
+        label_format='{:.0f}', axis_format='{x:.0f}', filename=None,
+        sec_col=None, sec_label=None, hash_list=None, scale_factor=1,
+        sort_index=False, plot_show=False, bar_labels=False,
+        bar_label_args=dict(), plt_args={}, folder='Plots/Barchart',
+        kind="bar", line_x_margins=None, fontsize=None, tight_layout=False):
+    """Plot stacked bar-chart with multiindex info formated below.
+
+    Useful hint: Control colors of individual columns with plt_args
+
+    .. code:: python
+
+        plt_args={'color': {'Fossil': 'tab:brown',
+                            'Renewable': 'tab:green'}}
+
+    Define the formatting of bar labels
+
+    .. code:: python
+
+        bar_label_args=dict(fmt='%.0f', label_type='center')
+
+    """
+    fontsize_default = plt.rcParams['font.size']
+    if fontsize is not None:
+        plt.rcParams['font.size'] = str(fontsize)
+
+    if len(y_label_list) == 0:
+        y_label_list = y_list
+    if sum_label is None:
+        sum_label = sum_col
+
+    if df.empty:
+        logger.error('DataFrame is empty')
+        # return
+
+    if hash_list is not None:
+        mask = df.index.get_level_values('hash').isin(hash_list)
+        df = df[mask].copy()
+
+    if idx_lvl is not None:
+        df = keeplevel(df, levels=idx_lvl)
+        try:
+            df = df.reorder_levels(idx_lvl)
+        except TypeError:
+            pass
+        if idx_lvl_labels is not None:
+            if len(idx_lvl_labels) > 1:
+                df.index.rename(idx_lvl_labels, inplace=True)
+            else:
+                df.index.rename(idx_lvl_labels[0], inplace=True)
+
+    if stay_positive:
+        df = df.abs()
+
+    if sort_index:
+        df.sort_index(inplace=True)
+
+    df_bar = df[y_list].copy()
+    df_bar *= scale_factor
+    df_bar.rename(columns=dict(zip(y_list, y_label_list)), inplace=True)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    if kind == "bar":
+        df_bar.plot.bar(stacked=stacked, rot=0, ax=ax, legend=False,
+                        **plt_args)
+    elif kind == "line":
+        df_bar.plot.line(rot=0, ax=ax, legend=False, **plt_args)
+        plt.margins(x=line_x_margins)  # Always needs manual alignment
+
+    # The easy built-in way to produce labels for the bars
+    if bar_labels or len(bar_label_args) > 0:
+        for container in ax.containers:
+            # Do not apply labels to bars with zero height
+            container.datavalues[container.datavalues == 0] = float("nan")
+            ax.bar_label(container, **bar_label_args)
+
+    # A more customizable way for labels
+    if sum_col is not None:
+        for x in y_label_list:  # Cycle through the color seletion
+            next(ax._get_lines.prop_cycler)['color']
+        if sum_color is None:
+            sum_color = next(ax._get_lines.prop_cycler)['color']
+
+        df_o = df_bar.reset_index(drop=True)
+        patch = ax.plot(df_o.sum(axis='columns'), marker=marker,
+                        markersize=markersize, linewidth=linewidth,
+                        label=sum_label, color=sum_color)
+        # The value to show can be different from the position
+        if sum_col in df.columns:
+            autolabel(ax, patch, float_format=label_format,
+                      rotation=sum_rot, df=df[sum_col].copy())
+        elif sum_col is True:
+            autolabel(ax, patch, float_format=label_format,
+                      rotation=sum_rot)
+
+    # Prepare for merging legend of primary and secondary axis
+    lines, labels = ax.get_legend_handles_labels()
+
+    if sec_col is not None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        ax_sec = df[sec_col].plot(ax=ax, secondary_y=True, marker=marker,
+                                  markersize=markersize, lw=linewidth,
+                                  mark_right=False, label=sec_label,
+                                  color=colors[-1])
+        ax_sec.set_ylim(top=1, bottom=0)
+        ax_sec.set_ylabel(sec_label)
+        lines_sec, labels_sec = ax_sec.get_legend_handles_labels()
+        lines += lines_sec
+        labels += labels_sec
+
+    ax.set_ylabel(y_label)
+    ax.yaxis.set_major_formatter(axis_format)
+    ax.xaxis.grid(False)
+    ax.yaxis.grid(True, zorder=0)
+    ax.set_axisbelow(True)
+
+    if ylim is not None:
+        ax.set_ylim(**ylim)
+    # ax.xaxis.set_tick_params(rotation=30)  # rotation is useful sometimes
+
+    if df_bar.index.nlevels > 1:
+        label_group_bar_table(ax, df_bar)  # Create MultiIndex x-axis
+
+    ax.legend(lines, labels, loc='lower center', ncol=legend_ncol,
+              bbox_to_anchor=(0.5, 1.0))
+    if tight_layout:
+        plt.tight_layout()
+    plt.tick_params(bottom=False)
+
+    if filename is None:
+        filename = ('Barchart Multiindex {}'.format(y_list))
+
+    logger.debug('Plot {}'.format(filename))
+    custom_plot_save(filename, folder=folder)
+    if plot_show:
+        plt.show()
+    else:
+        plt.close()
+
+    plt.rcParams['font.size'] = fontsize_default  # Reset to default font size
+
+    return ax
+
+
+def plot_KPIs(df, x, y, group_name=None, x_label=None,
+              y_label=None, group_label=None, point_name=None,
+              xmin=None, xmax=None, ymin=None, ymax=None, plot_show=False,
+              figsize=(13, 8), fontsize=None, fontsize_point=None,
+              fmt='o-', ms=10, horizontalalignment='center',
+              hash_list=None, filename_add='', folder='Plots/KPIs',
+              x_axis_format='{x:.0f}', y_axis_format='{x:.0f}'):
+    """Plot selected key performance indicators versus each other.
+
+    Allows KPIs, annual simulation results and deck properties (e.g.
+    installed capacity of a component) as input for x, y, group_name
+    and point_name. Data is put into coloured groups found in column
+    group_name and points are labeled with the data found in column
+    point_name. The results of all simulations in the list sims are
+    combined for this output.
+    """
+    logger.debug('Plot KPI {} vs. {}{}'.format(x, y, filename_add))
+
+    fontsize_default = plt.rcParams['font.size']
+    if fontsize is not None:
+        plt.rcParams['font.size'] = str(fontsize)
+
+    if fontsize_point is None:
+        fontsize_point = fontsize
+
+    if hash_list is not None:
+        m = df.index.get_level_values('hash').isin(hash_list)
+        df = df[m].copy()
+
+    if x_label is None:
+        x_label = x
+    if y_label is None:
+        y_label = y
+    if group_label is None:
+        group_label = group_name
+
+    if group_name is not None:
+        if group_name not in df.index.names:
+            df.set_index(group_name, append=True, inplace=True, drop=False)
+        groups = df.index.get_level_values(group_name).unique()
+        df_list = [df.xs(group, level=group_name) for group in groups]
+    else:
+        groups = ['']
+        df_list = [df]
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    ax.grid(True)  # has zorder=1?
+    for df_group, group in zip(df_list, groups):
+        # ax.scatter(x=x, y=y, data=df_group, s=100, label=group, zorder=2)
+        ax.plot(x, y, fmt, data=df_group, ms=ms, label=group, zorder=2)
+
+    if point_name is not None:
+        if point_name in df.index.names:
+            points = df.index.get_level_values(point_name)
+        elif point_name in df.columns:
+            points = df[point_name]
+        else:
+            logger.error('Column "%s" to be used as point_name not found',
+                         point_name)
+            points = [""]*len(df[x])
+        for x_coord, y_coord, text in zip(df[x], df[y], points):
+            plt.text(x_coord, y_coord, text, zorder=3,
+                     size=fontsize_point,
+                     horizontalalignment=horizontalalignment,
+                     verticalalignment='center')
+
+    if group_label is not None:
+        ax.legend(title=group_label)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_xlim(xmin=xmin, xmax=xmax)
+    ax.set_ylim(ymin=ymin, ymax=ymax)
+    ax.xaxis.set_major_formatter(x_axis_format)
+    ax.yaxis.set_major_formatter(y_axis_format)
+    filename = 'KPI {} vs. {}{}'.format(x, y, filename_add)
+    custom_plot_save(filename, folder=folder)
+    if plot_show:
+        plt.show()
+    else:
+        plt.close()
+
+    plt.rcParams['font.size'] = fontsize_default  # Reset to default font size
+
+    return ax
+
+
+def plot_annual_and_monthly(
+        df_months, df_year, x_label, y_list, y_label_list=[],
+        idx_lvl=None, idx_lvl_labels=None,
+        y_label='', title='', plot_show=False,
+        combine=False, hash_list=None, sharey=False,
+        figsize=(13, 8), hash_label='hash',
+        stacked=True, label_multiindex=False,
+        ylim_m=None, ylim_a=None, time_lvl="TIME", folder='Plots/Months',
+        label_table_names=False):
+    """Plot annual and monthly stacked bar charts."""
+    logger.debug('Plot annual and monthly plots')
+
+    if stacked:
+        legend = 'reverse'
+        ylim_m = dict(top=df_months[y_list].sum(axis="columns").max() * 1.05)
+        ylim_a = dict(top=df_year[y_list].sum(axis="columns").max() * 1.05)
+    else:
+        legend = True
+
+    df_months = df_months[y_list].copy()
+    df_year = df_year[y_list].copy()
+
+    if len(y_label_list) == 0:
+        y_label_list = y_list.copy()
+        # Convert "X_Y_Z_unit" strings to latex $X_{Y,Z}$ (without unit)
+        for i, string in enumerate(y_label_list):
+            g1, g2, g3 = re.match(r'(.+?)_(.*)_(.*)', string).groups()
+            y_label_list[i] = r'$'+g1+'_{'+g2.replace('_', ',')+'}$'
+
+        df_months.rename(columns=dict(zip(y_list, y_label_list)), inplace=True)
+        df_year.rename(columns=dict(zip(y_list, y_label_list)), inplace=True)
+
+    if idx_lvl is not None and idx_lvl_labels is not None:
+        if time_lvl in idx_lvl:
+            time_lvl = idx_lvl_labels[idx_lvl.index(time_lvl)]
+
+    _hash_list = hash_list  # Reset after last sim in sims
+
+    if _hash_list is None:
+        if isinstance(df_year.index, pd.MultiIndex):
+            _hash_list = list(df_year.index.unique(level='hash'))
+        else:
+            _hash_list = ['']
+
+        # if len(_hash_list) == 1:
+        #     _hash_list = ['']  # Set to emtpy string for filenames
+    else:
+        pass
+        # df_x = keeplevel(df, levels=[hash_label, time_lvl])
+        # df_list = [df_x.loc[_hash_list]]
+        # _hash_list = ['']
+
+    for _hash in _hash_list:
+        df_months_h = df_months.xs(_hash, level='hash',
+                                   drop_level=False).copy()
+        df_year_h = df_year.xs(_hash, level='hash', drop_level=False).copy()
+
+        if idx_lvl is not None:
+            df_months_h = keeplevel(df_months_h, levels=idx_lvl)
+            df_year_h = keeplevel(df_year_h, levels=idx_lvl)
+            try:
+                df_months_h = df_months_h.reorder_levels(idx_lvl)
+                df_year_h = df_year_h.reorder_levels(idx_lvl)
+            except TypeError:
+                pass
+            if idx_lvl_labels is not None:
+                if len(idx_lvl_labels) > 1:
+                    df_months_h.index.rename(idx_lvl_labels, inplace=True)
+                    df_year_h.index.rename(idx_lvl_labels, inplace=True)
+                else:
+                    df_months_h.index.rename(idx_lvl_labels[0], inplace=True)
+                    df_year_h.index.rename(idx_lvl_labels[0], inplace=True)
+
+        # df_months_h = df_months_h.swaplevel()
+        # df_year_h = df_year_h.swaplevel()
+
+        if not label_multiindex:  # Prevent other labels from plotting
+            df_months_h = keeplevel(df_months_h, levels=[time_lvl])
+            df_year_h = keeplevel(df_year_h, levels=[time_lvl])
+
+        if combine:
+            gs_kw = dict(width_ratios=[5, 1], height_ratios=[1])
+            fig, axs = plt.subplots(1, 2, sharey=sharey,
+                                    figsize=figsize, gridspec_kw=gs_kw)
+            df_months_h.plot(kind='bar', ax=axs[0], stacked=stacked,
+                             legend=legend,
+                             ylabel=y_label)
+            axs[0].set_xticklabels(
+                df_months_h.index.get_level_values(time_lvl).strftime('%b %Y')
+                )
+            axs[0].set_xlabel(x_label)
+            df_year_h.plot(kind='bar', ax=axs[1], stacked=stacked,
+                           legend=False, ylabel=y_label)
+            axs[1].set_xticklabels(
+                df_year_h.index.get_level_values(time_lvl).strftime('%Y'))
+            axs[1].set_xlabel(x_label)
+            if ylim_m is not None:
+                axs[0].set_ylim(**ylim_m)
+            if ylim_m is not None:
+                axs[1].set_ylim(**ylim_a)
+
+            if label_multiindex:  # grouped x-axis with more levels
+                df_months_h['Jahr'] = df_months_h.index.get_level_values(
+                    time_lvl).year
+                df_months_h.set_index('Jahr', append=True, inplace=True)
+                df_months_h = df_months_h.swaplevel()
+                df_label = df_months_h.rename(index=dict(zip(
+                    df_months_h.index.get_level_values(time_lvl),
+                    df_months_h.index.get_level_values(time_lvl)
+                    .strftime('%b'))))
+
+                label_group_bar_table(axs[0], df_label,
+                                      label_names=label_table_names,
+                                      rot_top_level=90)
+            if label_multiindex:  # grouped x-axis with more levels
+                df_label = df_year_h.rename(index=dict(zip(
+                    df_year_h.index.get_level_values(time_lvl),
+                    df_year_h.index.get_level_values(time_lvl)
+                    .strftime('%Y'))))
+                label_group_bar_table(axs[1], df_label,
+                                      label_names=label_table_names,
+                                      rot_top_level=90)
+
+            plt.suptitle(title)
+            custom_plot_save(
+                filename=('Barchart 2D {} {}'.format(_hash, title)),
+                folder=folder)
+            if plot_show:
+                plt.show()
+            else:
+                plt.close()
+
+        else:
+            ax = df_months_h.plot(kind='bar', stacked=stacked,
+                                  figsize=figsize, legend=legend,
+                                  title=title, ylabel=y_label)
+            ax.set_xticklabels(
+                df_months_h.index.get_level_values(time_lvl).strftime('%b')
+                )
+            ax.set_xlabel(x_label)
+            if ylim_m is not None:
+                ax.set_ylim(**ylim_m)
+
+            custom_plot_save(
+                filename=('Barchart 2D {} {} (Monate)'.format(_hash, title)),
+                folder=folder
+                )
+            if plot_show:
+                plt.show()
+            else:
+                plt.close()
+            ax = df_year_h.plot(kind='bar', stacked=stacked,
+                                legend=legend, title=title,
+                                ylabel=y_label)
+            ax.set_xticklabels(
+                df_year_h.index.get_level_values(time_lvl).strftime('%Y'))
+            ax.set_xlabel(x_label)
+            if ylim_a is not None:
+                ax.set_ylim(**ylim_a)
+            custom_plot_save(
+                filename=('Barchart 2D {} {} (Jahr)'.format(_hash, title)),
+                folder=folder)
+            if plot_show:
+                plt.show()
+            else:
+                plt.close()
 
 
 if __name__ == "__main__":
