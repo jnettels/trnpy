@@ -1503,8 +1503,8 @@ class DCK_processor():
         return df_new
 
     def results_resample(self, df, freq, regex_sum=r'^Q_|^E_',
-                         regex_mean=r'^T_|^M_', prio='sum', level=None,
-                         **kwargs):
+                         regex_mean=r'^T_|^P_|^M_|^V_|COP',
+                         prio='sum', level=None, **kwargs):
         """Resample a multi-indexed DataFrame to a new frequency.
 
         Expects the time column to be at last position in the multi-index.
