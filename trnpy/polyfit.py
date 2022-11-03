@@ -87,7 +87,7 @@ def polyfit2d(x, y, f, order):
 
     Return array of coefficients ``c`` as expected as input by numpy polyval2d.
 
-    .. math:: p(x,y) = \\sum_{i,j} c_{i,j} * x^i * y^j
+    .. math:: p(x,y) = \sum_{i,j} c_{i,j} * x^i * y^j
 
     Source:
     https://stackoverflow.com/questions/7997152/python-3d-polynomial-surface-fit-order-dependent
@@ -347,7 +347,6 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
     import matplotlib.path as mplPath
     from mpl_toolkits.mplot3d import Axes3D  # for plot_trisurf
     from matplotlib import cm
-    from mayavi import mlab
 
     def make_colormap(seq):
         """Return a LinearSegmentedColormap.
@@ -451,6 +450,8 @@ def poly2d_fit_and_plot(x, y, z, order=2, x_label='', y_label='', z_label='',
         fig.set_tight_layout(True)
 
     elif render == 'mayavi':
+        from mayavi import mlab
+
         # Plotting alternative to matplotlib
         # Axis grid is not yet solved
         # https://stackoverflow.com/questions/54863564/mayavi-how-to-show-the-axes-grid
