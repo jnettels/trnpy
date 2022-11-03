@@ -729,6 +729,7 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
         None.
 
     """
+    logger.debug('Creating %s', html_filename)
     if not os.path.exists(os.path.dirname(html_filename)):
         os.makedirs(os.path.dirname(html_filename))
 
@@ -813,7 +814,7 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
         x_axis_type = 'linear'
 
     # For DataFrame with Multiindex, get a list of unique units
-    if group_lvl in df.columns.names:
+    if group_lvl is not None and group_lvl in df.columns.names:
         groups = list(df.columns.get_level_values(group_lvl).unique())
     else:
         groups = [None]
@@ -839,13 +840,6 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
                 df_unit = df_group.xs(unit, level=unit_lvl, axis='columns')
             else:
                 continue  # Skip this unit
-            if len(fig_list) > 0:
-                # Synchronize the x_ranges of all subsequent figures to first
-                if sync_xaxis:
-                    fig_link = fig_list[0].children[0]
-            else:
-                fig_link = None
-
             if group is None and unit is None:
                 y_label = ""
             elif group is None:
@@ -859,6 +853,12 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
             col_s = 0  # Start column
             col_e = n_cols_max  # End column
             while col_e < len(df_unit.columns)+n_cols_max:
+                # Synchronize the x_ranges of all subsequent figures to first
+                if len(fig_list) > 0 and sync_xaxis:
+                    fig_link = fig_list[0].children[0]
+                else:
+                    fig_link = None
+
                 cols = df_unit.columns[col_s:min(col_e, len(df_unit.columns))]
                 col_s = col_e
                 col_e += n_cols_max
