@@ -35,6 +35,7 @@ import re
 import os
 import shutil
 import multiprocessing
+import threading
 import subprocess
 import time
 from collections.abc import Sequence
@@ -69,6 +70,7 @@ class TRNExe():
                  check_vital_sign=True,
                  pause_after_error=False,
                  delay=1,
+                 check_log_after_sim=True,
                  ):
         """Initialize the object.
 
@@ -108,6 +110,7 @@ class TRNExe():
         self.check_vital_sign = check_vital_sign
         self.pause_after_error = pause_after_error
         self.delay = delay  # seconds delay for each simulation start
+        self.check_log_after_sim = check_log_after_sim
 
     def run_TRNSYS_dck(self, dck, delay=0):
         """Run a TRNSYS simulation with the given deck dck_file.
@@ -118,7 +121,7 @@ class TRNExe():
             delay (float): A time in seconds
 
         Returns:
-            None
+            dck (dck object): The simulated DCK object
 
         The ``delay`` in seconds is added before calling the TRNSYS
         executable. This should prevent ``I/O Error`` messages from TRNSYS
@@ -159,21 +162,22 @@ class TRNExe():
             proc.wait()
 
         # Check for error messages in the log and store them in the deck object
-        if self.check_log_for_errors(dck) is False or dck.success is False:
-            dck.success = False
-            logger.debug('Finished PID %s with errors', proc.pid)
+        if self.check_log_after_sim:
+            if self.check_log_for_errors(dck) is False or dck.success is False:
+                dck.success = False
+                logger.debug('Finished PID %s with errors', proc.pid)
 
-            if self.pause_after_error:  # and not self.mode_exec_parallel:
-                error_msgs = ''
-                for i, error_msg in enumerate(dck.error_msg_list):
-                    error_msgs += '{}: {}\n'.format(i, error_msg)
-                logger.error('Errors in %s:\n%s', dck.file_path_dest,
-                             error_msgs)
-                input('Press enter key to continue with next simulation.\n')
+                if self.pause_after_error:  # and not self.mode_exec_parallel:
+                    error_msgs = ''
+                    for i, error_msg in enumerate(dck.error_msg_list):
+                        error_msgs += '{}: {}\n'.format(i, error_msg)
+                    logger.error('Errors in %s:\n%s', dck.file_path_dest,
+                                 error_msgs)
+                    input('Press enter to continue with next simulation.\n')
 
-        else:
-            logger.debug('Finished PID %s', proc.pid)
-            dck.success = True
+            else:
+                logger.debug('Finished PID %s', proc.pid)
+                dck.success = True
         # Return the deck object
         return dck
 
@@ -261,6 +265,7 @@ class TRNExe():
             True/False (bool): Status information
         """
         if self.check_vital_sign is False:
+            time.sleep(0.1)  # somehow this improves the simulation speed
             return True  # Skip the check if the user demands it
 
         try:
@@ -275,6 +280,34 @@ class TRNExe():
             pass
 
         return True
+
+    def mp_init(self, lock):
+        """Provide an initializer function for pool."""
+        global starting
+        starting = lock
+        # global start_time
+        # start_time = lock
+
+    def run_TRNSYS_with_delay(self, dck, unused=0):
+        """Run TRNSYS with a delay.
+
+        Especially decks with TRNBuild seemed to cause problems, i.e. not
+        start simulating, when they start at exactly the same time.
+
+        This implements a solution discussed here
+        https://stackoverflow.com/questions/30343018
+        """
+        # with start_time.get_lock():
+        #     wait_time = max(0, start_time.value - time.time())
+        #     time.sleep(wait_time)
+        #     start_time.value = time.time() + self.delay
+        #     # Now run the actual simulation
+        #     dck = self.run_TRNSYS_dck(dck, delay=0)
+
+        starting.acquire() # no other process can get it until it is released
+        threading.Timer(self.delay, starting.release).start() # release
+        dck = self.run_TRNSYS_dck(dck, delay=0)
+        return dck
 
     def run_TRNSYS_dck_list(self, dck_list):
         """Run one TRNSYS simulation of each deck file in the dck_list.
@@ -308,17 +341,36 @@ class TRNExe():
 
             logger.info('Parallel processing of %s jobs on %s cores',
                         len(dck_list), n_cores)
-            pool = multiprocessing.Pool(n_cores)
+            pool = multiprocessing.Pool(n_cores,
+                                        initializer=self.mp_init,
+                                        initargs=[multiprocessing.Lock()]
+                                        # initargs=[multiprocessing.Value('d')]
+                                        )
 
             # For short lists, imap seemed the fastest option.
             # With imap, the result is a consumable iterator
             # map_result = pool.imap(self.run_TRNSYS_dck, dck_list)
             # With starmap_async, the results are available immediately
-            delay_list = [x*self.delay for x in range(len(dck_list))]
+            # delay_list = [x*self.delay for x in range(len(dck_list))]
             # After the first n_cores simulations, no delay is needed
-            delay_list[n_cores:] = [0] * len(delay_list[n_cores:])
-            map_result = pool.starmap_async(self.run_TRNSYS_dck,
-                                            zip(dck_list, delay_list))
+            # delay_list[n_cores:] = [0] * len(delay_list[n_cores:])
+            # map_result = pool.starmap_async(self.run_TRNSYS_dck,
+            #                                 dck_list)
+            # delay_list = [x*self.delay for x in range(len(dck_list))]
+            delay_list = [0] * len(dck_list)
+            # delay_list = [x*self.delay for x in range(len(dck_list))]
+            # After the first n_cores simulations, no delay is needed
+            # delay_list[n_cores:] = [0] * len(delay_list[n_cores:])
+            # map_result = pool.starmap_async(self.run_TRNSYS_dck,
+            #                                 dck_list)
+            # map_result = pool.starmap_async(self.run_TRNSYS_with_delay,
+                                            # zip(dck_list, delay_list))
+            # map_result = pool.map_async(self.run_TRNSYS_dck,
+            #                             dck_list)
+            map_result = pool.map_async(self.run_TRNSYS_with_delay,
+                                        dck_list)
+            # map_result = pool.starmap_async(self.run_TRNSYS_dck,
+            #                                 zip(dck_list, delay_list))
 
             pool.close()  # No more processes can be launched
             self.print_progress(map_result, start_time)
@@ -1134,6 +1186,68 @@ class DCK_processor():
             raise RuntimeWarning('Errors found in ' + dck.file_path_dest)
 
         return error_found
+
+    def read_dck_results(self, dck, read_file_function):
+        dck.result_data = dict()
+
+        for result_file in dck.result_files:
+            # Construct the full path to the result file
+            result_file_path = os.path.join(os.path.dirname(
+                                            dck.file_path_dest),
+                                            result_file)
+            # Use the provided function to read the file
+            try:
+                df = read_file_function(result_file_path)
+            except Exception as ex:
+                logger.error('Error when trying to read result file "%s"'
+                             ': %s', result_file, ex)
+                df = pd.DataFrame()
+
+            dck.result_data[result_file] = df
+
+        return dck
+
+    def results_collect_parallel(self, dck_list, read_file_function,
+        origin=None, n_cores=0, t_col='TIME'):
+
+
+        if n_cores == 0:
+            n_cores = max(
+                1,  min(multiprocessing.cpu_count() - 1, len(dck_list)))
+
+        logger.info('Collecting %s results on %s cores',
+                    len(dck_list), n_cores)
+        pool = multiprocessing.Pool(n_cores)
+        map_result = pool.starmap_async(self.read_dck_results,
+                     zip(dck_list, [read_file_function]*len(dck_list)))
+        pool.close()  # No more processes can be launched
+        pool.join()  # Workers are removed
+        dck_list = map_result.get()
+
+        param_table = pd.concat(
+            [pd.DataFrame([dck.hash for dck in dck_list], columns=['hash']),
+             pd.DataFrame([dck.replace_dict for dck in dck_list])],
+            axis='columns')
+
+        logger.info('Concat DataFrames')
+        result_data = dict()
+        for result_file in dck_list[0].result_files:
+            hash_list = [dck.hash for dck in dck_list]
+            df_list = [dck.result_data[result_file] for dck in dck_list]
+            df = pd.concat(df_list, keys=[tuple(r) for r in param_table.to_numpy()], names=list(param_table.columns))
+            # Drop the last, unnamed, level
+            df.index = df.index.droplevel(-1)
+
+            if origin is not None:
+                # Convert index to DateTime
+                df[t_col] = pd.to_datetime(df[t_col], unit='h', origin=origin)
+
+            df.set_index(t_col, append=True, inplace=True)
+            result_data[result_file] = df
+
+        return result_data
+
+
 
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None, store_success=True, store_hours=True,
