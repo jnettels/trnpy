@@ -648,7 +648,11 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
                     toolbar_location=None, background_fill_color="#efefef",
                     sizing_mode=kwargs.get('sizing_mode', None))
 
-    range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
+    if p.renderers:  # If figure has actual line plots
+        range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
+    else:  # If figure is empty
+        range_tool = RangeTool()
+
     range_tool.overlay.fill_color = palette[0]
     range_tool.overlay.fill_alpha = 0.5
 
