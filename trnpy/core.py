@@ -127,8 +127,13 @@ class TRNExe():
         executable. This should prevent ``I/O Error`` messages from TRNSYS
         that are otherwise sometimes occurring.
         """
-        if not os.path.exists(self.path_TRNExe):
-            raise FileNotFoundError('TRNExe.exe not found: '+self.path_TRNExe)
+        if dck.path_TRNExe is not None:
+            path_TRNExe = dck.path_TRNExe
+        else:
+            path_TRNExe = self.path_TRNExe
+
+        if not os.path.exists(path_TRNExe):
+            raise FileNotFoundError('TRNExe.exe not found: '+path_TRNExe)
 
         if self.mode_trnsys_hidden:
             mode_trnsys = '/h'  # hidden mode
@@ -137,7 +142,7 @@ class TRNExe():
 
         time.sleep(delay)  # Start with a delay (seconds)
 
-        proc = subprocess.Popen([self.path_TRNExe, dck.file_path_dest,
+        proc = subprocess.Popen([path_TRNExe, dck.file_path_dest,
                                  mode_trnsys])
 
         logger.debug('TRNSYS started with PID %s (%s)', proc.pid,
@@ -471,6 +476,7 @@ class DCK():
         self.regex_result_files = regex_result_files
         self.dck_text = ''
         self.dck_equations = dict()  # Dict with all equations in dck_text
+        self.path_TRNExe = None
 
         # Perform the following functions to initialize some more values
         self.load_dck_text()
