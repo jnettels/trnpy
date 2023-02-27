@@ -715,7 +715,12 @@ class DCK_processor():
         Args:
             parametric_table (DataFrame): Pandas DataFrame
 
-            dck_file_list (list): List of file paths (or single path string)
+            dck_file_list (list): List of file paths, or single path string.
+            If a list of file paths is used in combination with a
+            parametric table, the ``hash`` property of each dck object
+            is assigned a tuple containing the name of the dck and the
+            index in the parametric table. This allows a unique
+            identification.
 
             copy_files (bool, optional): Find and copy all assigned files
             from the source to the simulation folder. Default is ``True``.
@@ -727,8 +732,12 @@ class DCK_processor():
         if (isinstance(dck_file_list, Sequence)
            and not isinstance(dck_file_list, str)):
             for dck_file in dck_file_list:
-                dck_list += self.get_parametric_dck_list(parametric_table,
-                                                         dck_file)
+                dck_objs = self.get_parametric_dck_list(parametric_table,
+                                                        dck_file)
+                for dck in dck_objs:
+                    # Make hash unique by including the name of deck file
+                    dck.hash = (dck.file_name, dck.hash)
+                dck_list += dck_objs
         else:  # Convert single dck_file path string to a list with one entry
             dck_list = self.get_parametric_dck_list(parametric_table,
                                                     dck_file_list)
@@ -846,6 +855,12 @@ class DCK_processor():
             # Default is to hand over a parametric_table DataFrame. For
             # convenience, a file path is accepted and read into a DataFrame
             parametric_table = self.parametric_table_read(parametric_table)
+
+        if parametric_table.index.duplicated().any():
+            logger.error('Index of parameter table with duplicates:\n %s',
+                         parametric_table.index)
+            raise ValueError("The provided parameter table has duplicates "
+                             "in its index. This is not allowed.")
 
         # Start building the list of deck objects
         dck_list = []
@@ -1215,8 +1230,11 @@ class DCK_processor():
 
     def results_collect_parallel(self, dck_list, read_file_function,
         origin=None, n_cores=0, t_col='TIME'):
+        """Collect the results of the simulations in parallel.
 
-
+        This can be used instead of results_collect, but not all features
+        are the same.
+        """
         if n_cores == 0:
             n_cores = max(
                 1,  min(multiprocessing.cpu_count() - 1, len(dck_list)))
@@ -1230,8 +1248,20 @@ class DCK_processor():
         pool.join()  # Workers are removed
         dck_list = map_result.get()
 
+        if isinstance(dck_list[0].hash, tuple):
+            # If different deck files are simulated each with different
+            # parameters, then the .hash value has a tuple of deck name
+            # and hash number, which need to be assigned to columns
+            hash_names = ['deck', 'hash']
+        else:
+            # Usually, the hash is a single value
+            hash_names = ['hash']
+
+        df_hashes = pd.DataFrame([dck.hash for dck in dck_list],
+                                 columns=hash_names)
+
         param_table = pd.concat(
-            [pd.DataFrame([dck.hash for dck in dck_list], columns=['hash']),
+            [df_hashes,
              pd.DataFrame([dck.replace_dict for dck in dck_list])],
             axis='columns')
 
@@ -1240,7 +1270,9 @@ class DCK_processor():
         for result_file in dck_list[0].result_files:
             hash_list = [dck.hash for dck in dck_list]
             df_list = [dck.result_data[result_file] for dck in dck_list]
-            df = pd.concat(df_list, keys=[tuple(r) for r in param_table.to_numpy()], names=list(param_table.columns))
+            df = pd.concat(df_list,
+                           keys=[tuple(r) for r in param_table.to_numpy()],
+                           names=list(param_table.columns))
             # Drop the last, unnamed, level
             df.index = df.index.droplevel(-1)
 
@@ -1343,8 +1375,16 @@ class DCK_processor():
                     df_new = read_file_function(result_file_path)
 
                     # Add the 'hash' and all the key, value pairs to DataFrame
-                    if dck.hash is not None:
+                    if isinstance(dck.hash, tuple):
+                        # If different deck files are simulated each with
+                        # different parameters, then the .hash value has a
+                        # tuple of deck name and hash number, which need to
+                        # be assigned to columns
+                        df_new[['deck', 'hash']] = dck.hash
+                    else:
+                        # Usually, the hash is a single value
                         df_new['hash'] = dck.hash
+
                     if store_success:
                         # Store simulation success
                         df_new['success'] = dck.success
@@ -1551,12 +1591,9 @@ class DCK_processor():
             df.reset_index(inplace=True)  # convert back to column
 
             # Create a list and use that as the new index columns
-            try:  # Try to create an index including 'hash'
-                idx_cols = ['hash'] + list(replace_dict.keys()) + [t_col]
-                df.set_index(keys=idx_cols, inplace=True)
-            except KeyError:
-                idx_cols = list(replace_dict.keys()) + [t_col]
-                df.set_index(keys=idx_cols, inplace=True)
+            idx_cols = [x for x in ['deck', 'hash'] if x in df.columns]
+            idx_cols += list(replace_dict.keys()) + [t_col]
+            df.set_index(keys=idx_cols, inplace=True)
 
             df.sort_index(inplace=True)
 

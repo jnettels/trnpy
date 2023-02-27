@@ -1678,9 +1678,16 @@ def get_sim_properties(dck_list, df=None, drop_expressions=True):
         df_props (DataFrame): DataFrame with simulation properties
 
     """
+    if isinstance(dck_list[0].hash, tuple):
+        hash_names = ['deck', 'hash']
+    else: # Usually, the hash is a single value
+        hash_names = ['hash']
+
     df_props = pd.DataFrame(
         data=[dck.find_equations() for dck in dck_list],
-        index=pd.Index(data=[dck.hash for dck in dck_list], name='hash'))
+        index=pd.MultiIndex.from_frame(
+            pd.DataFrame(data=[dck.hash for dck in dck_list],
+                         columns=hash_names)))
 
     if drop_expressions:
         for col in df_props.columns:
