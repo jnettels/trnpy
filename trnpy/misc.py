@@ -1707,12 +1707,15 @@ def keeplevel(df, levels, axis=0):
 
 
 def label_group_bar_table(ax, df, label_names=True,
-                          rot_top_level=0):
-    """Create the x-axis label for grouped bar charts."""
+                          rot_top_level=0, y_inc=0.1):
+    """Create the x-axis label for grouped bar charts.
+
+    y_inc controls the vertical increment in the table.
+    """
     from itertools import groupby
 
     def add_line(ax, xpos, ypos):
-        line = plt.Line2D([xpos, xpos], [ypos + .1, ypos],
+        line = plt.Line2D([xpos, xpos], [ypos + y_inc, ypos],
                           linewidth=0.6,
                           transform=ax.transAxes, color='gray')
         line.set_clip_on(False)
@@ -1722,7 +1725,7 @@ def label_group_bar_table(ax, df, label_names=True,
         labels = my_index.get_level_values(level)
         return [(k, sum(1 for i in g)) for k, g in groupby(labels)]
 
-    ypos = -0.1
+    ypos = -1 * y_inc
     scale = 1.0/df.index.size
     for level in range(df.index.nlevels)[::-1]:
         pos = 0
@@ -1743,7 +1746,7 @@ def label_group_bar_table(ax, df, label_names=True,
             add_line(ax, pos*scale, ypos)
             pos += rpos
         add_line(ax, pos*scale, ypos)
-        ypos -= .1
+        ypos -= y_inc
 
     # We are replacing the original x labels
     ax.set_xticklabels('')
