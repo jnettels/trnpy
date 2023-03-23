@@ -1153,7 +1153,7 @@ class DCK_processor():
                     logger.warning('Warnings in %s:\n%s', dck.file_path_dest,
                                    logs.to_string())
             except KeyError:
-                logs = pd.DataFrame()
+                logs = dck.df_log[0:0]  # Use an empty dataframe
             log_list.append(logs)
         log_dict = dict(zip([dck.hash for dck in dck_list], log_list))
         return log_dict
@@ -1177,7 +1177,7 @@ class DCK_processor():
                 logger.warning('Errors in %s:\n%s', dck.file_path_dest,
                                logs.to_string())
             except KeyError:
-                logs = pd.DataFrame()
+                logs = dck.df_log[0:0]  # Use an empty dataframe
             log_list.append(logs)
         log_dict = dict(zip([dck.hash for dck in dck_list], log_list))
         return log_dict
