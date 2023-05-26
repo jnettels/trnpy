@@ -9,6 +9,8 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER }}
+  
+  script: pip install .
 
   noarch: python
 
