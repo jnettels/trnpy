@@ -56,6 +56,8 @@ setup(
     url='https://github.com/jnettels/trnpy',
     install_requires=['pandas>=0.24.1', ],
     python_requires='>=3.7',
+    setup_requires=['setuptools_scm'],
+    use_scm_version=True,
     packages=['trnpy', 'trnpy/examples'],
     package_data={'trnpy/examples': ['Parametrics.xlsx'], },
     entry_points={
