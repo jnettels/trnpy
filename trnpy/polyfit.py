@@ -35,13 +35,19 @@ import numpy as np
 import pandas as pd
 import scipy
 import os
-import matplotlib as mpl         # Matplotlib
-import matplotlib.pyplot as plt  # Plotting library
 import logging
-import matplotlib.animation as animation
 
 # Define the logging function
 logger = logging.getLogger(__name__)
+
+try:
+    import matplotlib as mpl         # Matplotlib
+    import matplotlib.pyplot as plt  # Plotting library
+    import matplotlib.animation as animation
+except ImportError as e:
+    logger.exception(e)
+    logger.warning("Optional dependency 'matplotlib' can be installed with "
+                   "'conda install matplotlib'")
 
 
 def make_bokeh_colorbar(df, x, y, z, file=None):

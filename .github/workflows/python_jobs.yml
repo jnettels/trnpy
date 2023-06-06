@@ -1,0 +1,43 @@
+name: Python Jobs
+
+on: [push, pull_request]
+
+jobs:
+  job_1:
+    runs-on: ${{ matrix.os }}
+    name: Build
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.8", "3.9", "3.10"]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1  # use the latest code commit
+
+    - name: Setup conda with python ${{ matrix.python-version }}
+      uses: s-weigand/setup-conda@v1
+      with:
+        update-conda: true
+        python-version: ${{ matrix.python-version }}
+
+    - name: Initialize powershell for conda (Windows only)
+      if: runner.os == 'Windows'
+      run: conda init powershell
+
+    - name: Install dependencies with conda
+      run: |
+        conda install conda-build setuptools setuptools_scm
+
+    - name: Build with conda
+      run: |
+        conda build conda.recipe
+
+    - name: Lint with flake8
+      if: runner.os == 'Linux'  # Only needs to run once
+      run: |
+        conda install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics

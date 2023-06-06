@@ -33,24 +33,40 @@ import os
 import re
 import logging
 import multiprocessing
-import pandas as pd
 import yaml
 import time
-from collections.abc import Sequence
+import pandas as pd
 from pandas.tseries.frequencies import to_offset
-from bokeh.command.bootstrap import main
-from bokeh.plotting import figure, output_file, show
-from bokeh.models import ColumnDataSource, HoverTool, RangeTool, Panel, Tabs
-from bokeh.models.widgets import Div
-from bokeh.layouts import layout, column, gridplot
-from bokeh.palettes import Spectral11 as palette_default
-from bokeh.palettes import viridis
-from bokeh.io import save
-import matplotlib.pyplot as plt
-
+from collections.abc import Sequence
 
 # Define the logging function
 logger = logging.getLogger(__name__)
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError as e:
+    logger.exception(e)
+    logger.warning("Optional dependency 'matplotlib' can be installed with "
+                   "'conda install matplotlib'")
+
+try:
+    from bokeh.command.bootstrap import main
+    from bokeh.plotting import figure, output_file, show
+    from bokeh.models import ColumnDataSource, HoverTool, RangeTool, Tabs
+    from bokeh.models.widgets import Div
+    from bokeh.layouts import layout, column, gridplot
+    from bokeh.palettes import Spectral11 as palette_default
+    from bokeh.palettes import viridis
+    from bokeh.io import save
+except ImportError as e:
+    logger.exception(e)
+    logger.warning("Optional dependency 'bokeh' can be installed with "
+                   "'conda install bokeh'")
+
+try:  # TODO: Other parts of the code are not yet compatible with bokeh 3.0
+    from bokeh.models import Panel  # bokeh < 3.0
+except ImportError:
+    from bokeh.models import TabPanel as Panel  # bokeh >= 3.0
 
 
 def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
