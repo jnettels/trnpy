@@ -717,12 +717,13 @@ def create_bokeh_htmls(df_list, files, subfolder='Bokeh', html_show=False,
 
 
 def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
-                      html_filename='bokeh.html',
+                      html_filename='./bokeh.html',
                       html_show=True, sync_xaxis=True,
                       sizing_mode='stretch_width',
                       time_names=['Zeit', 'Time', 'TIME'],
                       dropna_cols=False,
                       margin=(0, 9, 0, 0),
+                      kind='line',
                       **kwargs):
     """Create a Bokeh html document from a Pandas DataFrame.
 
@@ -804,7 +805,7 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
 
 def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
                            unit_lvl=None, sizing_mode='stretch_width',
-                           n_cols_max=15, **kwargs):
+                           n_cols_max=15, kind='line', **kwargs):
     """Create Bokeh plots from a Pandas DataFrame.
 
     Args:
@@ -896,7 +897,7 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
 
 def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
                           output_backend='canvas', x_axis_type='linear',
-                          sizing_mode='stretch_both', **kwargs):
+                          sizing_mode='stretch_both', kind='line', **kwargs):
     """Create a Bokeh plot from a Pandas DataFrame.
 
     Args:
@@ -943,8 +944,12 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
             if not df[y_col].isna().all():
                 if isinstance(y_col, tuple):  # if columns have MultiIndex
                     y_col = "_" . join(y_col)  # join to match 'source' object
-                r = p.line(x=x_col, y=y_col, source=source, color=color,
-                           name=y_col, legend_label=y_col)
+                if kind == 'line':
+                    r = p.line(x=x_col, y=y_col, source=source, color=color,
+                                name=y_col, legend_label=y_col)
+                elif kind == 'scatter':
+                    r = p.scatter(x=x_col, y=y_col, source=source, color=color,
+                               name=y_col, legend_label=y_col)
                 # Add a hover tool to the figure
                 add_hover_tool(p, renderers=[r], x_col=x_col,
                                x_axis_type=x_axis_type)
@@ -967,7 +972,8 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
 
 
 def get_select_RangeTool(p, x_col, y_cols, source, palette=viridis(1),
-                         output_backend='canvas', x_axis_type='datetime'):
+                         output_backend='canvas', x_axis_type='datetime',
+                         kind='line'):
     """Return a new figure that uses the RangeTool to control the figure p.
 
     Args:
@@ -999,7 +1005,10 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=viridis(1),
     for y_col in y_cols:  # Show all lines of primary figure in "select", too
         if isinstance(y_col, tuple):  # if columns have MultiIndex
             y_col = "_" . join(y_col)  # join to match 'source' object
-        select.line(x=x_col, y=y_col, source=source)
+        if kind == 'line':
+            select.line(x=x_col, y=y_col, source=source)
+        elif kind == 'scatter':
+            select.scatter(x=x_col, y=y_col, source=source)
 
     # Create a RangeTool, that will be applied to the "select" figure
     range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool
@@ -1020,8 +1029,8 @@ def custom_bokeh_settings(p):
     # p.xaxis.major_label_orientation = 1.2
     if p.legend:
         # p.legend.background_fill_alpha = 0.5
-        # p.legend.location = "top_left"
-        p.legend.location = "top_right"
+        p.legend.location = "top_left"
+        # p.legend.location = "top_right"
         p.legend.click_policy = "hide"  # clickable legend items
         p.legend.spacing = -3
         p.legend.padding = 2
@@ -1743,6 +1752,7 @@ def label_group_bar_table(ax, df, label_names=True,
 
     ypos = -1 * y_inc
     scale = 1.0/df.index.size
+    min_lxpos = 1
     for level in range(df.index.nlevels)[::-1]:
         pos = 0
         if level == df.index.nlevels-1:  # Define rotation for top level
@@ -1761,12 +1771,19 @@ def label_group_bar_table(ax, df, label_names=True,
                     transform=ax.transAxes, rotation=rotation)
             add_line(ax, pos*scale, ypos)
             pos += rpos
+            # Store the minimum division within the x-axis
+            min_lxpos = min(min_lxpos, lxpos)
         add_line(ax, pos*scale, ypos)
         ypos -= y_inc
 
     # We are replacing the original x labels
     ax.set_xticklabels('')
     ax.set_xlabel('')
+    # Remove xticks
+    ax.set_xticks([])
+    # Adjust the space between the plotted points and the border of the plot
+    if min_lxpos < 1:
+        ax.margins(x=min_lxpos)
 
 
 def autolabel(ax, rects, float_format='{:.2f}', df=None, **kwargs):
