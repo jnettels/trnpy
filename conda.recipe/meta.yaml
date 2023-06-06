@@ -9,7 +9,7 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER }}
-  
+
   script: pip install .
 
   noarch: python
@@ -31,6 +31,7 @@ requirements:
         - pyyaml >=5.1
         - psutil
         - openpyxl
+        - xlsxwriter
 
     run_constrained:  # requirements of optional dependencies
         - bokeh <3.0
