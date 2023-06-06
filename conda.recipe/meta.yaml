@@ -32,6 +32,9 @@ requirements:
         - psutil
         - openpyxl
 
+    run_constrained:  # requirements of optional dependencies
+        - bokeh <3.0
+
 about:
     home: https://github.com/jnettels/trnpy
     summary: 'Parallelized TRNSYS simulation with Python'
