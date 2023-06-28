@@ -1,4 +1,4 @@
-"""Initialize the package and define version."""
+"""Parallelized TRNSYS simulations with Python."""
 from pkg_resources import get_distribution, DistributionNotFound
 
 try:
@@ -14,3 +14,6 @@ except DistributionNotFound:
     except (LookupError, Exception) as e:
         print(e)
         __version__ = '0.0.0'
+
+from .core import *
+from .misc import *
