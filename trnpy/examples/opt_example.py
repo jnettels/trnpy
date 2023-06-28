@@ -72,7 +72,7 @@ def main(perform_optimization=True):
             path_TRNExe=r'C:\Trnsys17\Exe\TRNExe.exe',
             mode_exec_parallel=True,
             mode_trnsys_hidden=True,
-            delay=0.1,
+            delay=1,  # Start each simulation with delay to prevent IO-Errors
             )
 
     # Create a regular dck_list without additional parameters
@@ -126,23 +126,39 @@ def TRNpy_optimize_scikit(proc, dck_proc, dck_file):
 
     target_col = 'QColl'  # Power of solar collector in TRNSYS simulation
     target_val = 1e8  # [kJ] Search for this amount of collected energy
-    NaN_val = 0.5  # used if the simulation did not succeed
+    NaN_val = 0.5  # Used if the simulation did not succeed
 
     opt_dimensions = {
         'STOP': [100, 1000],  # [h] Define min and max for simulation time
+        # Simulation time of 359h comes closest to the target of 1e8 kJ
         'STEP': [1],  # If a list of length=1 is used, a value stays constant
         }
+
+    # kappa is only used if acq_func is set to “LCB”. xi is used when
+    # acq_func is “EI” or “PI”. By default the acqusition function is
+    # set to “gp_hedge” which chooses the best of these three.
+    # See the following link for info about setting kappa and xi to favor
+    # exploration (with larger values) or exploitation (with smaller values):
+    # https://scikit-optimize.github.io/stable/auto_examples/exploration-vs-exploitation.html#sphx-glr-auto-examples-exploration-vs-exploitation-py
+    acq_func_kwargs = None
+    # acq_func_kwargs = {"xi": 10000, "kappa": 10000}
+    acq_func_kwargs = {"xi": 0.000001, "kappa": 0.001}
 
     opt_res = trnpy.misc.skopt_optimize(
         eval_func,
         opt_dimensions,
-        tol=1e6,  # tolerance for succesful optimization
+        tol=1.5e5,  # tolerance for succesful optimization
         n_initial_points=20,
         # initial_point_generator='random',
-        initial_point_generator='grid',
+        # initial_point_generator='grid',
+        initial_point_generator='lhs',
         n_calls=1000,  # maximum number of allowed simulations
+        acq_func='gp_hedge',  # gp_hedge, LCB, EI or PI
+        # acq_func='EI',  # gp_hedge, LCB, EI or PI
+        acq_func_kwargs=acq_func_kwargs,
         # n_cores=10,
         plots_dir=r'.\Result_opt',
+        yscale='log',
         )
     # print(opt_res)
 
@@ -242,7 +258,7 @@ def setup():
     # Global Pandas option for displaying terminal output
     pd.set_option('display.max_columns', 0)
     # Set the number of decimal points for the following terminal output
-    pd.set_option('precision', 2)
+    pd.set_option('display.precision', 2)
     # http://pandas.pydata.org/pandas-docs/stable/indexing.html#indexing-view-versus-copy
     pd.set_option('mode.chained_assignment', None)
 
