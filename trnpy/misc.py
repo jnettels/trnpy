@@ -931,6 +931,8 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
 
     kwargs.setdefault('plot_width', 1000)
     kwargs.setdefault('plot_height', 250)
+    kwargs.setdefault('tools',
+                      "pan, box_zoom, wheel_zoom, save, undo, redo, reset")
     # Create the primary plot figure
     p = figure(x_axis_type=x_axis_type,
                x_range=fig_x_range, output_backend=output_backend,
