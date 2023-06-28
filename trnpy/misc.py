@@ -1155,9 +1155,6 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     Evaluate points". A function ``eval_func`` for this has to be
     provided by the user.
 
-    More important information:
-    https://scikit-optimize.github.io/stable/auto_examples/exploration-vs-exploitation.html#sphx-glr-auto-examples-exploration-vs-exploitation-py
-
     Args:
         eval_func (function): Evaluation function. Must take a
         ``param_table`` as input, perform TRNSYS simulations, read
@@ -1216,6 +1213,14 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
               - `"lhs"` for a latin hypercube sequence,
               - `"grid"` for a uniform grid sequence
 
+            * acq_func (str, default: 'gp_hedge'):
+              Set acqusition function to gp_hedge, LCB, EI or PI
+
+            * acq_func_kwargs (dict, default={}):
+              Set `xi` or `kappa` to favor exploration (with larger values)
+              or exploitation (with smaller values). For more information see
+              https://scikit-optimize.github.io/stable/auto_examples/exploration-vs-exploitation.html#sphx-glr-auto-examples-exploration-vs-exploitation-py
+
             * See more: https://scikit-optimize.github.io/stable/modules/generated/skopt.Optimizer.html#skopt.Optimizer
 
     Returns:
@@ -1226,19 +1231,48 @@ def skopt_optimize(eval_func, opt_dimensions, n_calls=100, n_cores=0,
     .. note::
 
         I made the following change to ``skopt\optimizer\optimizer.py``
-        in function ``def _ask(self)`` to prevent dublicate evaluations:
+        in function ``def _ask(self)`` to prevent duplicate evaluations:
 
         .. code:: python
 
             if abs(min_delta_x) <= 1e-8:
-                next_x_new = self.space.rvs(random_state=self.rng)[0]
-                warnings.warn("The objective has been evaluated at point {} "
-                              "before, using {} instead"
-                              .format(next_x, next_x_new))
-                next_x = next_x_new
+                avoid_duplicates = True
+                if avoid_duplicates:
+                    next_x_new = next_x
+                    if hasattr(self, "next_xs_"):
+                        # Test if one of the acquisition functions proposed a
+                        # candidate that has not been used yet
+                        for x in self.next_xs_:
+                            next_x_new_ = self.space.inverse_transform(
+                                x.reshape((1, -1)))[0]
+                            if next_x_new_ != next_x:
+                                # Also compare for all previous points
+                                if next_x_new_ in self.Xi:
+                                    continue  # Do not use this candidate
+                                else:
+                                    next_x_new = next_x_new_
+                                    break  # Found an actually new candidate
+
+                    if next_x_new == next_x:
+                        # No new candidate could be found. Use a random one
+                        next_x_new = self.space.rvs(random_state=self.rng)[0]
+                        warnings.warn("The objective has been evaluated at "
+                                      "point {} before, using random point {}"
+                                      .format(next_x, next_x_new))
+                    next_x = next_x_new
+                else:
+                    warnings.warn("The objective has been evaluated at point "
+                                  "{} before".format(next_x))
+
+
+        See https://github.com/scikit-optimize/scikit-optimize/pull/1050
 
     """
-    import skopt
+    try:
+        import skopt
+    except ImportError as e:
+        raise ImportError("Optional dependency 'skopt' can be installed with "
+                          "'conda install scikit-optimize'") from e
     import skopt.plots
     import matplotlib as mpl
     import matplotlib.pyplot as plt  # Plotting library
@@ -1486,7 +1520,13 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
                 near_zero=1e-2, export_title=True,
                 width=1400, height=600):
     """Plot sankey diagram for simulation results."""
-    import holoviews_sankey  # unpublished custom library
+    try:
+        import holoviews_sankey  # Sankey flowcharts with holoviews
+    except ImportError as e:
+        raise ImportError(
+            "Error importing 'holoviews_sankey'. Install with "
+            "'conda install holoviews_sankey -c jnettels -c conda-forge'"
+            ) from e
 
     logger.debug('Plot Sankey simulation %s', sim)
 
