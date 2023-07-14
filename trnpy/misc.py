@@ -58,15 +58,16 @@ try:
     from bokeh.palettes import Spectral11 as palette_default
     from bokeh.palettes import viridis
     from bokeh.io import save
+
+    try:  # TODO: Other parts of the code are not yet compatible with bokeh 3.0
+        from bokeh.models import Panel  # bokeh < 3.0
+    except ImportError:
+        from bokeh.models import TabPanel as Panel  # bokeh >= 3.0
+
 except ImportError as e:
     logger.exception(e)
     logger.warning("Optional dependency 'bokeh' can be installed with "
                    "'conda install bokeh'")
-
-try:  # TODO: Other parts of the code are not yet compatible with bokeh 3.0
-    from bokeh.models import Panel  # bokeh < 3.0
-except ImportError:
-    from bokeh.models import TabPanel as Panel  # bokeh >= 3.0
 
 
 def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
@@ -289,7 +290,7 @@ def extract_units_from_df(df, cols_lvl, unit_lvl='Unit'):
 
 
 def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
-                       tips_cols=[], palette=palette_default, y_label=None,
+                       tips_cols=[], palette=None, y_label=None,
                        sum_circle_size=0, **kwargs):
     """Create stacked vertical bar plot in Bokeh from TRNSYS results.
 
@@ -305,6 +306,9 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()`` like
     ``plot_width``, etc.
     """
+    if palette is None:
+        palette = palette_default
+
     # Apply logic for default behaviour
     if stack_labels is not None:
         if len(stack_labels) == 0:
@@ -407,13 +411,16 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
 
 def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
                             y_cols_line=[], y_cols_stacked=[],
-                            palette=palette_default, export_file=False,
+                            palette=None, export_file=False,
                             **kwargs):
     """Create sorted annual load curve.
 
     The lines can be plotted as is, or stacked.
     """
     from pandas.tseries.frequencies import to_offset
+
+    if palette is None:
+        palette = palette_default
 
     # Filter out non-existing columns
     y_cols_line = [col for col in y_cols_line if col in df.columns]
@@ -492,7 +499,7 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
 
 
 def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
-                          palette=palette_default, **kwargs):
+                          palette=None, **kwargs):
     """Create a simple circle plot with Bokeh.
 
     One column ``x_col`` is plotted against all other columns (or the
@@ -501,6 +508,9 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()``
     like ``plot_width``, etc.
     """
+    if palette is None:
+        palette = palette_default
+
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = list(df_in.columns)
 
@@ -591,7 +601,7 @@ def bokeh_time_lines(df, fig_link=None, index_level='hash', x_col='TIME',
     return fig_list
 
 
-def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
+def bokeh_time_line(df_in, y_cols=[], palette=None,
                     fig_link=None, y_label=None, x_col='TIME', **kwargs):
     """Create line plots over a time axis for all or selected columns.
 
@@ -616,6 +626,9 @@ def bokeh_time_line(df_in, y_cols=[], palette=palette_default,
         Column of two figures: The time line plot and a select plot below
 
     """
+    if palette is None:
+        palette = palette_default
+
     if len(y_cols) == 0:  # Per default, use all columns in the DataFrame
         y_cols = list(df_in.columns)
 
@@ -973,7 +986,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
         return column([p, select], sizing_mode=sizing_mode)
 
 
-def get_select_RangeTool(p, x_col, y_cols, source, palette=viridis(1),
+def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
                          output_backend='canvas', x_axis_type='datetime',
                          kind='line'):
     """Return a new figure that uses the RangeTool to control the figure p.
@@ -998,6 +1011,9 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=viridis(1),
         select (figure): Bokeh figure with a range tool.
 
     """
+    if palette is None:
+        palette = viridis(1)
+
     select = figure(plot_height=45, y_range=p.y_range, tools="",
                     x_axis_type=x_axis_type, y_axis_type=None,
                     toolbar_location=None, background_fill_color="#efefef",
