@@ -31,6 +31,7 @@ the given ``dck`` objects.
 """
 
 import logging
+import math
 import re
 import os
 import shutil
@@ -540,7 +541,7 @@ class DCK():
                 logger.debug('Replaced placeholder "***" with deck file '
                              'name in the assigned file %s', file)
 
-    def find_equations(self, iteration=10, iteration_max=10):
+    def find_equations(self, iteration=0, iter_max=10):
         """Find equations with key and value in the text of the deck file.
 
         Fill and return a dictionary with the results.
@@ -551,8 +552,7 @@ class DCK():
         Args:
             iteration (int): Number of the current iteration
 
-            iteration_max (int): The maximum number of iterations. If changed,
-            the start value of iteration must match this.
+            iter_max (int): The maximum number of iterations.
 
         Returns:
             dck_equations (dict): Key, value pairs of equations in dck_text
@@ -613,7 +613,19 @@ class DCK():
             else:
                 return 0
 
-        if iteration >= iteration_max:
+        def custom_sin(x):
+            """Define custom function to replace TRNSYS function 'sin'."""
+            return math.sin(math.radians(x))
+
+        def custom_cos(x):
+            """Define custom function to replace TRNSYS function 'sin'."""
+            return math.cos(math.radians(x))
+
+        def custom_tan(x):
+            """Define custom function to replace TRNSYS function 'sin'."""
+            return math.tan(math.radians(x))
+
+        if iteration == 0:
             # Only find equations in the first iteration
             re_find = r'\n(?P<key>\b\S+)\s*=\s*(?P<value>.*?)(?=\s*\!|\s*\n)'
 
@@ -626,6 +638,9 @@ class DCK():
                     value = value.replace("and(", "custom_and(")
                     value = value.replace("or(", "custom_or(")
                     value = value.replace("^", "**")
+                    value = value.replace("sin(", "custom_sin(")
+                    value = value.replace("cos(", "custom_cos(")
+                    value = value.replace("tan(", "custom_tan(")
 
                     try:  # Try to convert the string to a float
                         self.dck_equations[key] = float(value)
@@ -639,7 +654,7 @@ class DCK():
         # to fill out variables and solve equations that failed before:
         for key, value in self.dck_equations.items():
             try:
-                self.dck_equations[key] = float(eval(value))
+                self.dck_equations[key] = float(eval(str(value)))
             except NameError as e:  # Equation contains a variable name
                 name = re.findall(r"'(.+)'", str(e))[0]
                 try:  # Try to find the value of the variable name
@@ -647,7 +662,7 @@ class DCK():
                 except KeyError:
                     pass
                 else:  # Substitute the variable name with its value
-                    eval_str = re.sub(name, str(name_value), value)
+                    eval_str = re.sub(name, str(name_value), value, count=1)
                     self.dck_equations[key] = eval_str  # Store result
                     try:  # Now try to convert it to a float again
                         self.dck_equations[key] = float(eval(eval_str))
@@ -656,10 +671,10 @@ class DCK():
             except Exception:
                 pass
 
-        if iteration > 0:
+        if iteration < iter_max:
             # Recursively solve more and more equations with each iteration
-            iteration -= 1
-            self.find_equations(iteration=iteration)
+            iteration += 1
+            self.find_equations(iteration=iteration, iter_max=iter_max)
 
         return self.dck_equations
 
