@@ -23,18 +23,19 @@ requirements:
         - python
         - setuptools
         - setuptools_scm
-        - pandas >=1.2.1
+        - pandas >=2.0
 
     run:
         - python
-        - pandas >=1.2.1
+        - pandas >=2.0
         - pyyaml >=5.1
         - psutil
         - openpyxl
         - xlsxwriter
 
     run_constrained:  # requirements of optional dependencies
-        - bokeh <3.0
+        - bokeh <3.0  # Code not adapted to versions >=3.0 yet
+        - selenium <4.3  # Required by bokeh<3.0, otherwise errors finding firefox
 
 about:
     home: https://github.com/jnettels/trnpy
