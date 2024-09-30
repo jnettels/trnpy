@@ -72,6 +72,7 @@ class TRNExe():
                  pause_after_error=False,
                  delay=1,
                  check_log_after_sim=True,
+                 cwd=None,
                  ):
         """Initialize the object.
 
@@ -101,6 +102,10 @@ class TRNExe():
             start. Helps prevent I/O-errors that seem to occur when two
             TRNSYS processes are started at the same moment. Default is ``1``.
 
+            cwd (str, optional): Path to be used as current working directory
+            when running TRNEXE. Typically this could be set to the location
+            of the .dck file that is simulated.
+
         Returns:
             None
         """
@@ -112,6 +117,7 @@ class TRNExe():
         self.pause_after_error = pause_after_error
         self.delay = delay  # seconds delay for each simulation start
         self.check_log_after_sim = check_log_after_sim
+        self.cwd = cwd
 
     def run_TRNSYS_dck(self, dck, delay=0):
         """Run a TRNSYS simulation with the given deck dck_file.
@@ -144,7 +150,7 @@ class TRNExe():
         time.sleep(delay)  # Start with a delay (seconds)
 
         proc = subprocess.Popen([path_TRNExe, dck.file_path_dest,
-                                 mode_trnsys])
+                                 mode_trnsys], cwd=self.cwd)
 
         logger.debug('TRNSYS started with PID %s (%s)', proc.pid,
                      dck.file_path_dest)
