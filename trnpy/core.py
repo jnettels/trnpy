@@ -726,7 +726,7 @@ class DCK_processor():
 
     def parametric_table_auto(self, parametric_table, dck_file_list,
                               copy_files=True):
-        """Automate the creation deck objects from a parametric table.
+        """Automate the creation of deck objects from a parametric table.
 
         Conveniently wrap the steps in the most common use case.
         A parametric table was given. Therefore we do the standard procedure
@@ -736,8 +736,8 @@ class DCK_processor():
         Args:
             parametric_table (DataFrame): Pandas DataFrame
 
-            dck_file_list (list): List of file paths, or single path string.
-            If a list of file paths is used in combination with a
+            dck_file_list (list or str): List of file paths, or single path
+            string. If a list of file paths is used in combination with a
             parametric table, the ``hash`` property of each dck object
             is assigned a tuple containing the name of the dck and the
             index in the parametric table. This allows a unique
@@ -835,7 +835,7 @@ class DCK_processor():
         elif filetype in ['.out']:
             # Standard format for TRNSYS: Separator is whitespace
             df = pd.read_csv(filepath,
-                             delim_whitespace=True,
+                             sep=r'\s+',
                              encoding='WINDOWS-1252',  # TRNSYS encoding
                              **kwargs)
         elif filetype in ['.dat', '.txt']:
@@ -1582,9 +1582,9 @@ class DCK_processor():
                     end_date = origin.replace(year=origin.year + n_years)
                     if time_label_left is False:
                         dr = pd.date_range(start=origin + freq_timedelta,
-                                           end=end_date, freq=freq_str+'H')
+                                           end=end_date, freq=freq_str+'h')
                     else:
-                        dr = pd.date_range(start=origin, freq=freq_str+'H',
+                        dr = pd.date_range(start=origin, freq=freq_str+'h',
                                            end=end_date - freq_timedelta)
                     # Remove leap year days from the date range
                     dr = dr[~((dr.month == 2) & (dr.day == 29))]
@@ -1608,7 +1608,7 @@ class DCK_processor():
             # With a simulation time step of one minute, rounding errors
             # can produce an imperfect index. Rounding to seconds may fix it:
             df.set_index(keys=[t_col], inplace=True)  # convert to index
-            df.index = df.index.round('S')  # Round to seconds
+            df.index = df.index.round('s')  # Round to seconds
             df.reset_index(inplace=True)  # convert back to column
 
             # Create a list and use that as the new index columns
