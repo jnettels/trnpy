@@ -1791,3 +1791,73 @@ class DCK_processor():
         df_new = pd.concat([sum_df, mean_df], axis=1)
         df_new = df_new[cols_found]  # Sort columns in their original order
         return df_new
+
+
+class SimStudio():
+    """Define the Simulation Studio class.
+
+    Can be used to create a DCK file from a Trnsys Project File (.tpf).
+
+    Uses the following command line options of Studio.exe:
+      /d create deck file
+      /r run simulation
+      /q quit
+
+    Other useful command line features of TRNSYS (not implemented):
+
+    TRNBuild: Create VFM from command line
+    subprocess.call(r'"C:\TRNSYS18\Building\TRNBuild.exe" "file.b18" /N /vfm')
+
+    TRNBuild: Create SHM/ISM from command line
+    subprocess.call(r'"C:\TRNSYS18\Building\TRNBuild.exe" "file.b18" /N /masks')
+    """
+
+    def __init__(self,
+                 path_Studio=r'C:\Trnsys17\Studio\Exe\Studio.exe',
+                 ):
+        """Initialize a Simulation Studio object.
+
+        Args:
+            path_Studio (str, optional): Path to Simulation Studio executable
+
+        Returns:
+            None
+        """
+        self.path_Studio = path_Studio
+
+    def create_dck_from_tpf(self, tpf, create=True, run=False, close=True,
+                            silence_errors=False):
+        """Create a dck file from the Trnsys Project File tpf.
+
+        Args:
+            tpf (str): Path to a Trnsys Project File.
+
+            create (bool): Create a .dck file from the tpf. Default is True.
+
+            run (bool): Run the simulation immediately. Be careful, a
+            simulation will be started, but Python code will not wait for the
+            simulation to finish. Use the TRNExe class for reliably running
+            simulations. Default is False.
+
+            close (bool): Close Simulation Studio automatically. Defaul is True
+
+        Returns:
+            ret (int): A return value of 0 indicates success
+
+        """
+        args = [self.path_Studio, os.path.abspath(tpf)]
+        if create:
+            args.append('/d')
+        if run:
+            args.append('/r')
+            logger.warning("A simulation will be started, but Python code "
+                           "not wait for the simulation to finish.")
+        if close:
+            args.append('/q')
+
+        logger.info("Calling Simulation Studio with command '%s'",
+                    ' '.join(args))
+        ret = subprocess.call(args)
+        if ret != 0 and not silence_errors:
+            raise ValueError("Simulation Studio returned error")
+        return ret
