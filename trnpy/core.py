@@ -1449,10 +1449,14 @@ class DCK_processor():
                     continue
                 if df[column].dtype == 'object':
                     logger.error(
-                        'Column "{}" in file "{}" has dtype object. '
+                        'Column "{}" in file "{}" has dtype "object". '
                         'This may be caused by extremely small numbers '
                         'like 1.234E-100 that TRNSYS writes as 1.234-100.'
                         .format(column, file))
+                    # Try to fix this TRNSYS-bug by placing the missing "E":
+                    df[column] = df[column].replace(r"(\d)(\-)(\d\d\d)",
+                                                    r"\1E-\3", regex=True)
+                    df[column] = pd.to_numeric(df[column])
 
         return result_data
 
