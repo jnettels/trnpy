@@ -32,6 +32,7 @@ by other modules such as Pandas, Bokeh, Scikit-Optimize and DataExplorer.
 import os
 import re
 import logging
+import locale
 import multiprocessing
 import yaml
 import time
@@ -211,7 +212,7 @@ def df_set_filtered_to_NaN(df, filters, mask, value=float('NaN')):
     for column_ in df.columns:
         for filter_ in filters:
             if filter_ in column_ or filter_ == column_:
-                df[column_][mask] = value
+                df.loc[mask, column_] = value
                 break  # Break inner for-loop if one filter was matched
     return df
 
@@ -287,6 +288,19 @@ def extract_units_from_df(df, cols_lvl, unit_lvl='Unit'):
     idx_new[unit_lvl] = unit_list
     df.columns = pd.MultiIndex.from_frame(idx_new)
     return df
+
+
+def bokeh_save_html(figures, sizing_mode='stretch_width',
+                    html_show=False, html_file=None, html_title=None):
+    """Save and/or show bokeh figures to html with the most basic settings."""
+    layout_1 = layout(figures, sizing_mode=sizing_mode)
+
+    if html_file is not None:
+        output_file(html_file, title=html_title)
+        if html_show:
+            show(layout_1)  # Trigger opening a browser window with the html
+        else:
+            save(layout_1)  # Save the html without showing it
 
 
 def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
@@ -695,7 +709,47 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
     return column(p, select)
 
 
-def create_bokeh_htmls(df_list, files, subfolder='Bokeh', html_show=False,
+def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
+                                      max_tabs=5, **kwargs):
+    """Create interactive HTML documents from a Pandas DataFrame.
+
+    Split into different html files if number of tabs exceed max_tabs.
+    Otherwise file sizes become to large.
+    """
+    file_list = []
+    df_list = []
+
+    hashes = df.index.get_level_values(tab_grouper).unique()
+    tabs = len(hashes)
+    if max_tabs is False or max_tabs >= tabs or max_tabs <= 0:
+        # Put everything into one file
+        df_list.append(df)
+        file_list.append(html_filename)
+    else:
+        # Seperate into individual files
+        tab_first = 0
+        tab_last = max_tabs
+        while tab_first < tabs:
+            hashes_select = hashes[tab_first:tab_last]
+            df_list.append(df.loc[hashes_select])
+            if tab_first == tab_last-1:
+                file_list.append(
+                    '{}_{}'.format(os.path.splitext(html_filename)[0],
+                                   tab_first))
+            else:
+                file_list.append(
+                    '{}_[{}-{}]'.format(os.path.splitext(html_filename)[0],
+                                        tab_first, tab_last-1))
+            tab_first += max_tabs
+            tab_last = min(tab_last + max_tabs, tabs)
+
+    create_bokeh_htmls(
+        df_list=df_list, files=file_list,
+        tab_grouper=tab_grouper,
+        **kwargs)
+
+
+def create_bokeh_htmls(df_list, files, subfolder='', html_show=False,
                        sizing_mode='stretch_width', **kwargs):
     """Create interactive HTML files with Bokeh, for each DataFrame.
 
@@ -723,8 +777,9 @@ def create_bokeh_htmls(df_list, files, subfolder='Bokeh', html_show=False,
             os.makedirs(os.path.dirname(filepath))
 
         # Create the output file
+        kwargs.setdefault('title', os.path.basename(file))
         logger.info('Saving %s', filepath)
-        create_bokeh_html(df, title=os.path.basename(file),
+        create_bokeh_html(df,
                           html_filename=filepath, html_show=html_show,
                           sizing_mode=sizing_mode, **kwargs)
 
@@ -1534,7 +1589,7 @@ def convert_user_next_ranges(args_list):
 def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
                 project="Project", decimals=0, time_lvl='TIME',
                 near_zero=1e-2, export_title=True,
-                width=1400, height=600):
+                width=1400, height=600, **kwargs):
     """Plot sankey diagram for simulation results."""
     try:
         import holoviews_sankey  # Sankey flowcharts with holoviews
@@ -1599,6 +1654,7 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
                 toolbar_location=None,
                 export_title=export_title,
                 width=width, height=height,
+                **kwargs,
                 )
 
             sankey_list.append(bkplot)
@@ -1610,7 +1666,8 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
     doc_layout = gridplot(sankey_list, ncols=1, sizing_mode='stretch_width')
     # Create the output file
     filename_sankey = os.path.join(path_sankey,
-                                   '{} {}'.format(project, sim))
+                                   '{} {}'.format(project, sim)
+                                   .replace(" ", "_"))
     output_file(filename_sankey + '.html', title=title_html)
 
     if html_show:
@@ -1687,7 +1744,8 @@ def replace_kJ_with_MWh(df, name_lvl=None):
         df.columns = pd.Index(df_columns)
     else:
         df_columns = df.columns.to_frame(index=False)
-        df_columns[name_lvl].replace('_kJ$', '_MWh', inplace=True, regex=True)
+        df_columns.replace({name_lvl: {'_kJ$': '_MWh'}},
+                           inplace=True, regex=True)
         idx = df_columns[name_lvl].str.endswith('_MWh')
         df.columns = pd.MultiIndex.from_frame(df_columns)
 
@@ -1699,7 +1757,7 @@ def replace_kJ_with_MWh(df, name_lvl=None):
 
 def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
                      replace_zero_with_nan=False):
-    """Create new column name E_*_MWh from P_*_kW."""
+    """Create new column name P_*_kW from E_*_MWh."""
     freq = pd.Timedelta(to_offset(pd.infer_freq(
             df.iloc[0:3].index.get_level_values(time_lvl)))
             ) / pd.Timedelta('1 hours')
@@ -1736,7 +1794,8 @@ def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
     return df
 
 
-def get_sim_properties(dck_list, df=None, drop_expressions=True):
+def get_sim_properties(dck_list, df=None, drop_expressions=True,
+                       iter_max=10):
     """Get a DataFrame with the simulation deck properties.
 
     Trnpy provides a function dck.find_equations() to get the contents
@@ -1757,17 +1816,20 @@ def get_sim_properties(dck_list, df=None, drop_expressions=True):
         will be dropped. This includes e.g. all equations that reference
         "linked" values, instead of referencing values by name.
 
+        iter_max (int): The maximum number of iterations performed when
+        solving equations.
+
     Returns:
         df_props (DataFrame): DataFrame with simulation properties
 
     """
     if isinstance(dck_list[0].hash, tuple):
         hash_names = ['deck', 'hash']
-    else: # Usually, the hash is a single value
+    else:  # Usually, the hash is a single value
         hash_names = ['hash']
 
     df_props = pd.DataFrame(
-        data=[dck.find_equations() for dck in dck_list],
+        data=[dck.find_equations(iter_max=iter_max) for dck in dck_list],
         index=pd.MultiIndex.from_frame(
             pd.DataFrame(data=[dck.hash for dck in dck_list],
                          columns=hash_names)))
@@ -1875,9 +1937,48 @@ def autolabel(ax, rects, float_format='{:.2f}', df=None, **kwargs):
         logger.error(ex)
 
 
+def bar_labels(ax, relative=None, **bar_label_args):
+    """Add labels to the bars in ax, optionally showing relative values.
+
+    relative (str):
+        Name of the axis ('index' or 'columns') over which to compute the sum
+        for the relative values to display. If None, use absolute values.
+
+    bar_label_args:
+        See
+    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar_label.html
+    """
+    # Reconstruct the original data
+    df = pd.DataFrame([container.datavalues for container in ax.containers])
+    # Do not apply labels to bars with zero height
+    df.replace(0, float('nan'), inplace=True)
+
+    for i, container in enumerate(ax.containers):
+        if relative is not None:
+            if relative in [0, 'index']:
+                labels = df.div(df.sum(axis=relative), axis='columns')
+            elif relative in [1, 'columns']:
+                labels = df.div(df.sum(axis=relative), axis='index')
+
+            fmt = bar_label_args.get('fmt', '{:.1%}')  # format as percentage
+            labels = [fmt.format(x) if pd.notna(x) else '' for x in labels.loc[i]]
+
+            if locale.getlocale()[0] in ['de_DE']:
+                labels = [label.replace('.', ',') for label in labels]
+
+            bar_label_args['labels'] = labels
+
+        ax.bar_label(container, **bar_label_args)
+
+
 def custom_plot_save(filename, folder='Plots', dpi=750,
                      transparent=False, extensions=['.png', '.svg']):
-    """Save plot figures to different file formats."""
+    """Save plot figures to different file formats.
+
+    Convert SVG to EMF
+    import subprocess
+    subprocess.run(['inkscape', input_svg, '--export-type="emf"'])
+    """
     filepath = os.path.join(folder, filename)
     if not os.path.exists(os.path.dirname(filepath)):
         os.makedirs(os.path.dirname(filepath))
@@ -1897,7 +1998,8 @@ def plot_barchart_multiindex(
         sec_col=None, sec_label=None, hash_list=None, scale_factor=1,
         sort_index=False, plot_show=False, bar_labels=False,
         bar_label_args=dict(), plt_args={}, folder='Plots/Barchart',
-        kind="bar", line_x_margins=None, fontsize=None, tight_layout=False):
+        kind="bar", line_x_margins=None, fontsize=None, tight_layout=False,
+        legend_loc='lower center', sec_top=1, sec_bot=0):
     """Plot stacked bar-chart with multiindex info formated below.
 
     Useful hint: Control colors of individual columns with plt_args
@@ -1970,10 +2072,14 @@ def plot_barchart_multiindex(
 
     # A more customizable way for labels
     if sum_col is not None:
-        for x in y_label_list:  # Cycle through the color seletion
-            next(ax._get_lines.prop_cycler)['color']
-        if sum_color is None:
-            sum_color = next(ax._get_lines.prop_cycler)['color']
+        try:
+            for x in y_label_list:  # Cycle through the color seletion
+                next(ax._get_lines.prop_cycler)['color']
+            if sum_color is None:
+                sum_color = next(ax._get_lines.prop_cycler)['color']
+        except AttributeError:  # Since at least matplotlib 3.8
+            colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+            sum_color = colors[len(y_label_list)]
 
         df_o = df_bar.reset_index(drop=True)
         patch = ax.plot(df_o.sum(axis='columns'), marker=marker,
@@ -1996,7 +2102,7 @@ def plot_barchart_multiindex(
                                   markersize=markersize, lw=linewidth,
                                   mark_right=False, label=sec_label,
                                   color=colors[-1])
-        ax_sec.set_ylim(top=1, bottom=0)
+        ax_sec.set_ylim(top=sec_top, bottom=sec_bot)
         ax_sec.set_ylabel(sec_label)
         lines_sec, labels_sec = ax_sec.get_legend_handles_labels()
         lines += lines_sec
@@ -2015,8 +2121,9 @@ def plot_barchart_multiindex(
     if df_bar.index.nlevels > 1:
         label_group_bar_table(ax, df_bar)  # Create MultiIndex x-axis
 
-    ax.legend(lines, labels, loc='lower center', ncol=legend_ncol,
-              bbox_to_anchor=(0.5, 1.0))
+    if legend_loc is not None:
+        ax.legend(lines, labels, loc=legend_loc, ncol=legend_ncol,
+                  bbox_to_anchor=(0.5, 1.0))
     if tight_layout:
         plt.tight_layout()
     plt.tick_params(bottom=False)
@@ -2129,15 +2236,17 @@ def plot_annual_and_monthly(
         combine=False, hash_list=None, sharey=False,
         figsize=(13, 8), hash_label='hash',
         stacked=True, label_multiindex=False,
-        ylim_m=None, ylim_a=None, time_lvl="TIME", folder='Plots/Months',
+        ylim_m=None, ylim_a=None, ylim_sync=True,
+        time_lvl="TIME", folder='Plots/Months',
         label_table_names=False):
     """Plot annual and monthly stacked bar charts."""
     logger.debug('Plot annual and monthly plots')
 
     if stacked:
         legend = 'reverse'
-        ylim_m = dict(top=df_months[y_list].sum(axis="columns").max() * 1.05)
-        ylim_a = dict(top=df_year[y_list].sum(axis="columns").max() * 1.05)
+        if ylim_sync:
+            ylim_m = dict(top=df_months[y_list].sum(axis="columns").max()*1.05)
+            ylim_a = dict(top=df_year[y_list].sum(axis="columns").max()*1.05)
     else:
         legend = True
 
@@ -2288,6 +2397,75 @@ def plot_annual_and_monthly(
                 plt.show()
             else:
                 plt.close()
+
+
+def plot_sorted_load_curve(df, index_level='hash', x_col='TIME',
+                           x_label="Hours", y_list=[], y_label_list=[],
+                           y_label=None, filename=None,
+                           export_xlsx=False, plot_show=True,
+                           set_zero_to_nan=True,
+                           **kwargs):
+    """Plot sorted annual load curve."""
+    from pandas.tseries.frequencies import to_offset
+
+    # Filter out non-existing columns
+    y_list = [col for col in y_list if col in df.columns]
+
+    # Filter out empty columns (test for NaN and 0)
+    y_list = [c for c in y_list if any(df[c].notna())]
+    y_list = [c for c in y_list if any(df[c] != 0)]
+
+    if len(y_label_list) == 0:
+        y_label_list = y_list.copy()
+        # Convert "X_Y_Z_unit" strings to latex $X_{Y,Z}$ (without unit)
+        for i, string in enumerate(y_label_list):
+            g1, g2, g3 = re.match(r'(.+?)_(.*)_(.*)', string).groups()
+            y_label_list[i] = r'$'+g1+'_{'+g2.replace('_', ',')+'}$'
+
+    df = df.rename(columns=dict(zip(y_list, y_label_list)))
+
+    if set_zero_to_nan:
+        df = df.replace(0, float('NaN'))
+
+    df_sort_list = []
+    hash_list = []
+
+    for hash_ in sorted(set(df.index.get_level_values(index_level))):
+        df_plot = df.loc[(hash_, slice(None), slice(None)), :]  # use hash only
+        df_plot = df_plot.reset_index()  # Remove index
+        df_plot.set_index(x_col, inplace=True)  # Make time the only index
+
+        # Create index for x axis of new plot
+        freq = pd.to_timedelta(to_offset(pd.infer_freq(df_plot.index)))
+        timedelta = df_plot.index[-1] - (df_plot.index[0] - freq)
+        index = pd.timedelta_range(start=freq, end=timedelta, freq=freq,
+                                   name=x_col) / pd.Timedelta(1, 'h')
+
+        # Create a new DataFrame and fill it with the sorted values
+        df_sorted = pd.DataFrame(index=index)
+        for y_col in y_label_list:
+            sort = df_plot.sort_values(by=y_col, axis=0, ascending=False)
+            df_sorted[y_col] = sort[y_col].values
+
+        # ax.suptitle()
+        df_sorted[y_label_list].plot(
+            xlabel=x_label, ylabel=y_label, title=str(hash_), **kwargs)
+
+        df_sort_list.append(df_sorted)
+        hash_list.append(hash_)
+
+        custom_plot_save(filename=f'{filename} {hash_}', folder='')
+
+        if plot_show:
+            plt.show()
+        else:
+            plt.close()
+
+    if export_xlsx:
+        df_to_excel(df=df_sort_list, path=export_xlsx,
+                    sheet_names=hash_list)
+
+    return
 
 
 if __name__ == "__main__":
