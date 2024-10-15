@@ -21,7 +21,6 @@ build:
 requirements:
     build:
         - python
-        - setuptools
         - setuptools_scm
         - pandas >=2.0
 

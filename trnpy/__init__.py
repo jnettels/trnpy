@@ -1,11 +1,11 @@
 """Parallelized TRNSYS simulations with Python."""
-from pkg_resources import get_distribution, DistributionNotFound
+from importlib.metadata import version, PackageNotFoundError
 
 try:
     dist_name = 'trnpy'
     # Try to get the version name from the installed package
-    __version__ = get_distribution(dist_name).version
-except DistributionNotFound:
+    __version__ = version(dist_name)
+except PackageNotFoundError:
     try:
         # If package is not installed, try to get version from git
         from setuptools_scm import get_version
