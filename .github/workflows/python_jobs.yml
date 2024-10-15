@@ -7,9 +7,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: Build
     strategy:
+      fail-fast: false  # complete remaining jobs
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
     - name: Checkout
@@ -18,7 +19,7 @@ jobs:
     - name: Setup conda with python ${{ matrix.python-version }}
       uses: s-weigand/setup-conda@v1
       with:
-        update-conda: true
+        update-conda: false
         python-version: ${{ matrix.python-version }}
 
     - name: Initialize powershell for conda (Windows only)
