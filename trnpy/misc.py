@@ -60,10 +60,10 @@ try:
     from bokeh.palettes import viridis
     from bokeh.io import save
 
-    try:  # TODO: Other parts of the code are not yet compatible with bokeh 3.0
-        from bokeh.models import Panel  # bokeh < 3.0
+    try:  # Code tries to be compatible with bokeh 2 and 3
+        from bokeh.models import TabPanel  # bokeh >= 3.0
     except ImportError:
-        from bokeh.models import TabPanel as Panel  # bokeh >= 3.0
+        from bokeh.models import Panel  # bokeh < 3.0
 
 except ImportError as e:
     logger.exception(e)
@@ -318,7 +318,7 @@ def bokeh_stacked_vbar(df_in, stack_labels=[], stack_labels_neg=[],
     The x-axis will have two groups: hash and TIME.
 
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()`` like
-    ``plot_width``, etc.
+    ``width``, etc.
     """
     if palette is None:
         palette = palette_default
@@ -520,7 +520,7 @@ def bokeh_circles_from_df(df_in, x_col, y_cols=[], tips_cols=[], size=10,
     list ``y_cols``) of a Pandas DataFrame.
 
     Use ``**kwargs`` to pass additional keyword arguments to ``figure()``
-    like ``plot_width``, etc.
+    like ``width``, etc.
     """
     if palette is None:
         palette = palette_default
@@ -578,7 +578,7 @@ def bokeh_time_lines(df, fig_link=None, index_level='hash', x_col='TIME',
         Is passed down to ``bokeh_time_line()``.
 
         Other keyword arguments are passed to ``bokeh_time_line()``,
-        where they are passed to Bokeh's ``figure()``, e.g. ``plot_width``.
+        where they are passed to Bokeh's ``figure()``, e.g. ``width``.
 
     Return:
         A list of the Bokeh figures.
@@ -634,7 +634,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
 
     kwargs:
         Other keyword arguments are passed to Bokeh's ``figure()``,
-        e.g. ``plot_width``.
+        e.g. ``width``.
 
     Returns:
         Column of two figures: The time line plot and a select plot below
@@ -686,7 +686,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
         p.yaxis.axis_label = y_label
 
     # Add a new figure that uses the range_tool to control the figure p
-    select = figure(plot_height=45, plot_width=p.plot_width, y_range=p.y_range,
+    select = figure(height=45, width=p.width, y_range=p.y_range,
                     x_axis_type=x_axis_type, y_axis_type=None, tools="",
                     toolbar_location=None, background_fill_color="#efefef",
                     sizing_mode=kwargs.get('sizing_mode', None))
@@ -704,7 +704,11 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
 
     select.ygrid.grid_line_color = None
     select.add_tools(range_tool)
-    select.toolbar.active_multi = range_tool
+    try:  # bokeh<3.0
+        select.toolbar.active_multi = range_tool
+    except ValueError:  # bokeh>=3.0
+        # Activation of the tool is not required in bokeh>=3.0
+        pass
 
     return column(p, select)
 
@@ -853,7 +857,10 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
                                               sizing_mode=sizing_mode,
                                               margin=margin, **kwargs)
             _column = column([div, *fig_list], sizing_mode=sizing_mode)
-            tab_list.append(Panel(child=_column, title=str(_hash)))
+            try:  # bokeh < 3.0
+                tab_list.append(Panel(child=_column, title=str(_hash)))
+            except NameError:  # bokeh >= 3.0
+                tab_list.append(TabPanel(child=_column, title=str(_hash)))
 
         elements = Tabs(tabs=tab_list)
     else:
@@ -896,7 +903,7 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
         None.
 
     """
-    kwargs.setdefault('plot_height', 350)
+    kwargs.setdefault('height', 350)
 
     # Determine the type of the x axis
     if df.index.inferred_type == 'datetime64':
@@ -997,8 +1004,8 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
     else:  # link to the range of the given figure
         fig_x_range = fig_link.x_range
 
-    kwargs.setdefault('plot_width', 1000)
-    kwargs.setdefault('plot_height', 250)
+    kwargs.setdefault('width', 1000)
+    kwargs.setdefault('height', 250)
     kwargs.setdefault('tools',
                       "pan, box_zoom, wheel_zoom, save, undo, redo, reset")
     # Create the primary plot figure
@@ -1069,7 +1076,7 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
     if palette is None:
         palette = viridis(1)
 
-    select = figure(plot_height=45, y_range=p.y_range, tools="",
+    select = figure(height=45, y_range=p.y_range, tools="",
                     x_axis_type=x_axis_type, y_axis_type=None,
                     toolbar_location=None, background_fill_color="#efefef",
                     output_backend=output_backend,
@@ -1090,7 +1097,12 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
 
     select.ygrid.grid_line_color = None
     select.add_tools(range_tool)
-    select.toolbar.active_multi = range_tool
+    try:  # bokeh<3.0
+        select.toolbar.active_multi = range_tool
+    except ValueError:  # bokeh>=3.0
+        # Activation of the tool is not required in bokeh>=3.0
+        pass
+
     return select
 
 
