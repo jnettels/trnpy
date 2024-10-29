@@ -1026,15 +1026,15 @@ class DCK_processor():
         """
         dck_list = [DCK(dck_file, regex_result_files=self.regex_result_files)
                     for dck_file in dck_file_list]
-        if update_dest:
-            for dck in dck_list:
+        for dck in dck_list:
+            dck.hash = dck.file_name  # use name as unique identifier
+
+            if update_dest:
                 dck.file_path_dest = os.path.join(self.sim_folder,
                                                   dck.file_name,
                                                   dck.file_name+'.dck')
-                dck.hash = dck.file_name  # use name as unique identifier
-
-            if copy_files:
-                self.copy_assigned_files(dck_list)
+        if update_dest and copy_files:
+            self.copy_assigned_files(dck_list)
 
         return dck_list
 
