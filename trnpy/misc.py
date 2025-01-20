@@ -828,6 +828,11 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
     if not os.path.exists(os.path.dirname(html_filename)):
         os.makedirs(os.path.dirname(html_filename))
 
+    # tab_grouper is expected to be an index level. If it is a column level,
+    # make it an index level
+    if tab_grouper not in df.index.names and tab_grouper in df.columns.names:
+        df = df.stack(tab_grouper)
+
     if isinstance(df.index, pd.MultiIndex):
         # Assume that the first index level is the "hash" that defines
         # different simulations
@@ -1600,7 +1605,7 @@ def convert_user_next_ranges(args_list):
 
 def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
                 project="Project", decimals=0, time_lvl='TIME',
-                near_zero=1e-2, export_title=True,
+                near_zero=1e-2, export_title=True, unit='MWh',
                 width=1400, height=600, **kwargs):
     """Plot sankey diagram for simulation results."""
     try:
@@ -1646,7 +1651,10 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
             if not os.path.exists(os.path.dirname(filename_sankey)):
                 os.makedirs(os.path.dirname(filename_sankey))
 
-            title = '{} {} (MWh/a)'.format(project, sim)
+            if unit is None or unit == '':
+                title = '{} {}'.format(project, sim)
+            else:
+                title = '{} {} ({}/a)'.format(project, sim, unit)
 
             names = df_year.index.names
             params = [df_year.index.get_level_values(n)[0] for n in names]
@@ -1659,7 +1667,7 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
                 title=title,
                 title_html=title_html,
                 filename=filename_sankey,
-                unit='MWh',
+                unit=unit,
                 decimals=decimals,
                 label_text_font_size='9pt',
                 node_width=20,
@@ -2161,7 +2169,7 @@ def plot_KPIs(df, x, y, group_name=None, x_label=None,
               figsize=(13, 8), fontsize=None, fontsize_point=None,
               fmt='o-', ms=10, horizontalalignment='center',
               hash_list=None, filename_add='', folder='Plots/KPIs',
-              x_axis_format='{x:.0f}', y_axis_format='{x:.0f}'):
+              x_axis_format='{x:.0f}', y_axis_format='{x:.0f}', ax=None,):
     """Plot selected key performance indicators versus each other.
 
     Allows KPIs, annual simulation results and deck properties (e.g.
@@ -2200,7 +2208,11 @@ def plot_KPIs(df, x, y, group_name=None, x_label=None,
         groups = ['']
         df_list = [df]
 
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    if ax is None:  # Use input axis or create a new figure and axis
+        axis_was_input = False
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+    else:
+        axis_was_input = True
     ax.grid(True)  # has zorder=1?
     for df_group, group in zip(df_list, groups):
         # ax.scatter(x=x, y=y, data=df_group, s=100, label=group, zorder=2)
@@ -2223,18 +2235,22 @@ def plot_KPIs(df, x, y, group_name=None, x_label=None,
 
     if group_label is not None:
         ax.legend(title=group_label)
-    ax.set_xlabel(x_label)
-    ax.set_ylabel(y_label)
+    if x_label is not False:
+        ax.set_xlabel(x_label)
+    if y_label is not False:
+        ax.set_ylabel(y_label)
     ax.set_xlim(xmin=xmin, xmax=xmax)
     ax.set_ylim(ymin=ymin, ymax=ymax)
     ax.xaxis.set_major_formatter(x_axis_format)
     ax.yaxis.set_major_formatter(y_axis_format)
-    filename = 'KPI {} vs. {}{}'.format(x, y, filename_add)
-    custom_plot_save(filename, folder=folder)
-    if plot_show:
-        plt.show()
-    else:
-        plt.close()
+    if folder is not None:
+        filename = 'KPI {} vs. {}{}'.format(x, y, filename_add)
+        custom_plot_save(filename, folder=folder)
+    if not axis_was_input:  # Skip this if a figure axis was a function input
+        if plot_show:
+            plt.show()
+        else:
+            plt.close()
 
     plt.rcParams['font.size'] = fontsize_default  # Reset to default font size
 
