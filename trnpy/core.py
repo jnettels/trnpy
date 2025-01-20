@@ -725,7 +725,7 @@ class DCK_processor():
         self.regex_result_files = regex_result_files
 
     def parametric_table_auto(self, parametric_table, dck_file_list,
-                              copy_files=True):
+                              copy_files=True, disable_plotters=False):
         """Automate the creation of deck objects from a parametric table.
 
         Conveniently wrap the steps in the most common use case.
@@ -746,6 +746,12 @@ class DCK_processor():
             copy_files (bool, optional): Find and copy all assigned files
             from the source to the simulation folder. Default is ``True``.
 
+            disable_plotters (bool, optional): If true, disable all plotters
+            by setting their parameter 9 to '-1'. Even if TRNSYS is run in
+            'hidden' mode, the plot data is still stored in files named e.g.
+            D1_0.TMP during simulation, which can consume lots of storage
+            space. Disabling the plotters prevents this. Default is ``False``.
+
         Returns:
             dck_list (list): List of dck objects
         """
@@ -762,6 +768,10 @@ class DCK_processor():
         else:  # Convert single dck_file path string to a list with one entry
             dck_list = self.get_parametric_dck_list(parametric_table,
                                                     dck_file_list)
+
+        if disable_plotters:
+            for dck in dck_list:
+                self.disable_plotters(dck)
 
         self.rewrite_dcks(dck_list)
         if copy_files:
