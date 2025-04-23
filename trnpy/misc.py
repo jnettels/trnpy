@@ -2195,7 +2195,8 @@ def plot_KPIs(df, x, y, group_name=None, x_label=None,
               figsize=(13, 8), fontsize=None, fontsize_point=None,
               fmt='o-', ms=10, horizontalalignment='center',
               hash_list=None, filename_add='', folder='Plots/KPIs',
-              x_axis_format='{x:.0f}', y_axis_format='{x:.0f}', ax=None,):
+              x_axis_format='{x:.0f}', y_axis_format='{x:.0f}', ax=None,
+              **kwargs):
     """Plot selected key performance indicators versus each other.
 
     Allows KPIs, annual simulation results and deck properties (e.g.
@@ -2242,7 +2243,8 @@ def plot_KPIs(df, x, y, group_name=None, x_label=None,
     ax.grid(True)  # has zorder=1?
     for df_group, group in zip(df_list, groups):
         # ax.scatter(x=x, y=y, data=df_group, s=100, label=group, zorder=2)
-        ax.plot(x, y, fmt, data=df_group, ms=ms, label=group, zorder=2)
+        ax.plot(x, y, fmt, data=df_group, ms=ms, label=group, zorder=2,
+                **kwargs)
 
     if point_name is not None:
         if point_name in df.index.names:
