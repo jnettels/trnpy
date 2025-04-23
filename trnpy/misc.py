@@ -296,6 +296,8 @@ def bokeh_save_html(figures, sizing_mode='stretch_width',
     layout_1 = layout(figures, sizing_mode=sizing_mode)
 
     if html_file is not None:
+        if not os.path.exists(os.path.dirname(html_file)):
+            os.makedirs(os.path.dirname(html_file))
         output_file(html_file, title=html_title)
         if html_show:
             show(layout_1)  # Trigger opening a browser window with the html
