@@ -784,7 +784,6 @@ def create_bokeh_htmls(df_list, files, subfolder='', html_show=False,
 
         # Create the output file
         kwargs.setdefault('title', os.path.basename(file))
-        logger.info('Saving %s', filepath)
         create_bokeh_html(df,
                           html_filename=filepath, html_show=html_show,
                           sizing_mode=sizing_mode, **kwargs)
@@ -826,7 +825,7 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
         None.
 
     """
-    logger.debug('Creating %s', html_filename)
+    logger.info('Saving %s', html_filename)
     if not os.path.exists(os.path.dirname(html_filename)):
         os.makedirs(os.path.dirname(html_filename))
 
