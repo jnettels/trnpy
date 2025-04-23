@@ -1790,6 +1790,7 @@ def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
         idx = df_columns[name_lvl].str.endswith('_MWh')
         name_lvl_i = df.columns.names.index(name_lvl)
 
+    power_cols = []
     for energy_col in df.loc[:, df.columns[idx]]:
 
         if name_lvl is None:
@@ -1806,11 +1807,18 @@ def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
             power_col[name_lvl_i] = power
             power_col = tuple(power_col)
 
-        # Create new column name E_*_MWh from P_*_kW
-        df[power_col] = df[energy_col] * 1000 / freq  # MWh to kW
+        # Create new column with name P_*_MWh from E_*_kW
+        df_power_col = df[[energy_col]] * 1000 / freq  # MWh to kW
+        df_power_col = df_power_col.rename(columns={energy: power},
+                                           level=name_lvl)
 
         if replace_zero_with_nan:
-            df[power_col].replace(0, float('NaN'), inplace=True)
+            power_col.replace(0, float('NaN'), inplace=True)
+
+        power_cols.append(df_power_col)
+
+    df_power = pd.concat(power_cols, axis=1)
+    df = pd.concat([df, df_power], axis=1)
 
     return df
 
