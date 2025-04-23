@@ -53,9 +53,10 @@ except ImportError as e:
 try:
     from bokeh.command.bootstrap import main
     from bokeh.plotting import figure, output_file, show
-    from bokeh.models import ColumnDataSource, HoverTool, RangeTool, Tabs
+    from bokeh.models import (ColumnDataSource, HoverTool, RangeTool, Tabs,
+                              CustomJS, Button)
     from bokeh.models.widgets import Div
-    from bokeh.layouts import layout, column, gridplot
+    from bokeh.layouts import layout, column, row, gridplot
     from bokeh.palettes import Spectral11 as palette_default
     from bokeh.palettes import viridis
     from bokeh.io import save
@@ -959,7 +960,7 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
             while col_e < len(df_unit.columns)+n_cols_max:
                 # Synchronize the x_ranges of all subsequent figures to first
                 if len(fig_list) > 0 and sync_xaxis:
-                    fig_link = fig_list[0].children[0]
+                    fig_link = fig_list[0].children[1].children[0]
                 else:
                     fig_link = None
 
@@ -1022,6 +1023,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
     # Create the glyphs in the figure (one line plot for each data column)
     y_cols = list(df.columns)
     palette = viridis(len(y_cols))  # Generate color palette of correct length
+    lines = []
     for y_col, color in zip(y_cols, palette):
         try:
             if not df[y_col].isna().all():
@@ -1029,13 +1031,15 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
                     y_col = "_" . join(y_col)  # join to match 'source' object
                 if kind == 'line':
                     r = p.line(x=x_col, y=y_col, source=source, color=color,
-                                name=y_col, legend_label=y_col)
+                               name=y_col, legend_label=y_col)
                 elif kind == 'scatter':
                     r = p.scatter(x=x_col, y=y_col, source=source, color=color,
-                               name=y_col, legend_label=y_col)
+                                  name=y_col, legend_label=y_col)
                 # Add a hover tool to the figure
                 add_hover_tool(p, renderers=[r], x_col=x_col,
                                x_axis_type=x_axis_type)
+
+                lines.append(r)
         except ValueError:
             logger.error('Error with column "%s"', y_col)
             raise
@@ -1045,13 +1049,26 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
     else:
         custom_bokeh_settings(p)  # Set additional features of the plot
 
+        # Create a button to hide/show all lines
+        button = Button(label="Hide", button_type="default", default_size=50)
+        callback = CustomJS(args=dict(lines=lines, button=button), code="""
+            let isVisible = button.label == 'Hide'
+            for (let i = 0; i < lines.length; i++) {
+                lines[i].visible = !isVisible;
+            }
+            button.label = isVisible ? 'Show' : 'Hide';
+        """)
+
+        button.js_on_click(callback)
+
         if y_label is not None:
             p.yaxis.axis_label = y_label
 
         select = get_select_RangeTool(p, x_col, y_cols, source, palette,
                                       output_backend, x_axis_type=x_axis_type)
 
-        return column([p, select], sizing_mode=sizing_mode)
+        layout = row(button, column([p, select], sizing_mode=sizing_mode))
+        return layout
 
 
 def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
