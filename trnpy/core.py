@@ -1804,7 +1804,7 @@ class DCK_processor():
 
 
 class SimStudio():
-    """Define the Simulation Studio class.
+    r"""Define the Simulation Studio class.
 
     Can be used to create a DCK file from a Trnsys Project File (.tpf).
 
