@@ -193,13 +193,13 @@ class TRNExe():
         # Return the deck object
         return dck
 
-    def check_logs_for_errors(self, dck_list):
+    def check_logs_for_errors(self, dck_list, **kwargs):
         """Check logs of all dcks in dck_list for errors."""
         for dck in dck_list:
-            self.check_log_for_errors(dck)
+            self.check_log_for_errors(dck, **kwargs)
         return dck_list
 
-    def check_log_for_errors(self, dck):
+    def check_log_for_errors(self, dck, origin=pd.Timestamp("2025-01-01 00:00")):
         """Store errors in error_msg_list. Return False if errors are found.
 
         Function tries to open the log file of the given simulation and
@@ -234,11 +234,13 @@ class TRNExe():
         df_log.index.set_names("No", inplace=True)
         df_log.set_index("Severity", append=True, inplace=True)
         df_log["Time"] = df_log["Time"].astype(float)
+        df_log = df_log.rename(columns={"Time": "Hour"})
+        df_log["Time"] = origin + pd.to_timedelta(df_log["Hour"], unit='hours')
         # Clean up the message text, removing newlines and spaces
-        df_log.replace("Not applicable or not available", float("nan"),
-                       inplace=True)
+        df_log.replace("Not applicable or not available", pd.NA, inplace=True)
         df_log.replace("\n", "", regex=True, inplace=True)
         df_log.replace(r"\s+", " ", inplace=True, regex=True)
+        df_log = df_log[['Hour', 'Time', 'Unit', 'Type', 'Message']]
         dck.df_log = df_log  # Store the log in the dck object
 
         # Capture warnings and errors in the old style with lists
