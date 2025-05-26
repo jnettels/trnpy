@@ -2294,9 +2294,13 @@ def plot_annual_and_monthly(
         stacked=True, label_multiindex=False,
         ylim_m=None, ylim_a=None, ylim_sync=True,
         time_lvl="TIME", folder='Plots/Months',
-        label_table_names=False):
+        label_table_names=False, drop_null=False):
     """Plot annual and monthly stacked bar charts."""
     logger.debug('Plot annual and monthly plots')
+
+    if df_year.empty:
+        logger.warning("No annual and monthly plotting performed for empty df")
+        return
 
     if stacked:
         legend = 'reverse'
@@ -2305,6 +2309,12 @@ def plot_annual_and_monthly(
             ylim_a = dict(top=df_year[y_list].sum(axis="columns").max()*1.05)
     else:
         legend = True
+
+    if drop_null:
+        # Exclude all columns with all entries equal zero
+        y_list_non_zero = [c for c in y_list if (df_year[c] != 0).any()]
+        if len(y_list_non_zero) > 0:
+            y_list = y_list_non_zero
 
     df_months = df_months[y_list].copy()
     df_year = df_year[y_list].copy()
