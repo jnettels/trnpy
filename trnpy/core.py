@@ -1318,8 +1318,6 @@ class DCK_processor():
 
         return result_data
 
-
-
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None, store_success=True, store_hours=True,
                         remove_leap_year=True, time_label_left=False,
@@ -1413,26 +1411,33 @@ class DCK_processor():
                         # different parameters, then the .hash value has a
                         # tuple of deck name and hash number, which need to
                         # be assigned to columns
-                        df_new[['deck', 'hash']] = dck.hash
+                        hash_names = ['deck', 'hash']
                     else:
                         # Usually, the hash is a single value
-                        df_new['hash'] = dck.hash
+                        hash_names = ['hash']
+
+                    df_hashes = pd.DataFrame([dck.hash]*len(df_new),
+                                             columns=hash_names)
+
+                    df_rplc = (pd.DataFrame
+                               .from_dict(dck.replace_dict, orient='index')
+                               .T.reindex(df_new.index)
+                               .infer_objects(copy=False)
+                               .ffill(axis='index')
+                               )
 
                     if store_success:
                         # Store simulation success
                         df_new['success'] = dck.success
-                    for key, value in dck.replace_dict.items():
-                        df_new[key] = value
+
+                    df_new = pd.concat([df_new, df_hashes, df_rplc],
+                                       axis='columns')
 
                     # Add the DataFrame to the dict of result files
                     if result_file in result_data.keys():
-                        df_old = result_data[result_file]
+                        result_data[result_file].append(df_new)
                     else:
-                        df_old = pd.DataFrame()
-                    # Append the old and new df, with a new index.
-                    df = pd.concat([df_old, df_new], ignore_index=True)
-                    # Add it to the dict
-                    result_data[result_file] = df
+                        result_data[result_file] = [df_new]
 
                 except Exception as ex:
                     logger.error('Error when trying to read result file "%s"'
@@ -1441,6 +1446,10 @@ class DCK_processor():
             if logger.isEnabledFor(logging.INFO):  # Print progress
                 frac = i/len(dck_list)*100
                 print('\rCollecting results: {:5.1f}%'.format(frac), end='\r')
+
+        # For each file, turn the list of DataFrames into one DataFrame
+        for result_file, df_list in result_data.items():
+            result_data[result_file] = pd.concat(df_list, ignore_index=True)
 
         logger.debug('Collected result files:')
         if logger.isEnabledFor(logging.DEBUG):
@@ -1563,7 +1572,7 @@ class DCK_processor():
                 df_list = []
                 for hash_ in df.index.get_level_values('hash').unique():
                     df_hash = df.xs(hash_, drop_level=False)
-                    df_hash = df_hash[-keep_steps:]
+                    df_hash = df_hash[-keep_steps:].copy()
                     df_hash.reset_index(inplace=True)
                     df_hash[t_col] = df_hash[t_col] - df_hash[t_col][0]
                     df_list.append(df_hash)
@@ -1657,7 +1666,7 @@ class DCK_processor():
                     logger.warning(
                         key+': Data has leap years '+', '.join(years))
 
-            result_data[key] = df  # df is not modified in place
+            result_data[key] = df.copy()  # df is not modified in place
 
         return result_data
 

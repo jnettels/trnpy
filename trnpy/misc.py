@@ -454,8 +454,8 @@ def bokeh_sorted_load_curve(df, index_level='hash', x_col='TIME', y_label=None,
     hash_list = []
 
     for hash_ in sorted(set(df.index.get_level_values(index_level))):
-        df_plot = df.loc[(hash_, slice(None), slice(None)), :]  # use hash only
-        df_plot = df_plot.reset_index()  # Remove index
+        df_plot = df.loc[(hash_, slice(None), slice(None)), :].copy()
+        df_plot = df_plot.reset_index()  # Use hash only and remove index
         df_plot.set_index(x_col, inplace=True)  # Make time the only index
 
         # Create index for x axis of new plot
