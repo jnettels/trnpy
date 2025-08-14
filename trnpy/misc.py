@@ -34,7 +34,6 @@ import re
 import logging
 import locale
 import multiprocessing
-import yaml
 import time
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
@@ -42,6 +41,13 @@ from collections.abc import Sequence
 
 # Define the logging function
 logger = logging.getLogger(__name__)
+
+try:
+    import yaml
+except ImportError as e:
+    logger.exception(e)
+    logger.warning("Optional dependency 'yaml' can be installed with "
+                   "'conda install pyyaml'")
 
 try:
     import matplotlib.pyplot as plt

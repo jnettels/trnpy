@@ -29,35 +29,34 @@ Run with the following command prompt to install into Python environment:
 
 .. code::
 
-    python setup.py install
+    pip install .
+
+Or use the following to install all optional dependencies:
+
+.. code::
+
+    pip install .[full]
 
 
 """
 from setuptools import setup
-from setuptools_scm import get_version
-
-
-try:
-    version = get_version(version_scheme='post-release')
-except LookupError:
-    version = '0.0.0'
-    print('Warning: setuptools-scm requires an intact git repository to detect'
-          ' the version number for this build.')
 
 # The setup function
 setup(
     name='trnpy',
-    version=version,
+    use_scm_version=True,
     description='Parallelized TRNSYS simulation with Python',
     long_description=open('README.md').read(),
     license='GPL-3.0',
     author='Joris Zimmermann',
     author_email='joris.zimmermann@stw.de',
     url='https://github.com/jnettels/trnpy',
-    install_requires=['pandas>=0.24.1', ],
+    install_requires=['pandas>=2.0', 'psutil', 'openpyxl'],
     python_requires='>=3.7',
     setup_requires=['setuptools_scm'],
-    use_scm_version=True,
+    extras_require={
+        'full':  ['pyyaml', 'matplotlib', 'bokeh'],
+    },
     packages=['trnpy', 'trnpy/examples'],
     package_data={'trnpy/examples': ['Parametrics.xlsx'], },
     entry_points={
