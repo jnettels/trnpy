@@ -1,8 +1,8 @@
-{% set data = load_setup_py_data() %}
+{% set version = GIT_DESCRIBE_TAG %}
 
 package:
   name: trnpy
-  version: {{ data['version'] }}
+  version: {{ version }}
 
 source:
     path: ..
