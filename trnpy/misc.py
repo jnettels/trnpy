@@ -195,7 +195,7 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
 
             kwargs['freeze_panes'] = (freeze_rows, len(df.index.names))
         elif kwargs['freeze_panes'] is False:
-            del(kwargs['freeze_panes'])
+            del kwargs['freeze_panes']
 
         # Save one DataFrame to one Excel file
         df.to_excel(path, merge_cells=merge_cells, **kwargs)
@@ -935,7 +935,10 @@ def create_bokeh_timelines(df, sync_xaxis=True, group_lvl=None,
         if group is None:
             df_group = df
         else:
-            df_group = df.xs(group, level=group_lvl, axis='columns')
+            if isinstance(df.columns, pd.MultiIndex):
+                df_group = df.xs(group, level=group_lvl, axis='columns')
+            else:
+                df_group = df[[group]]
 
         for unit in units:
             if unit is None:
@@ -1026,7 +1029,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
     lines = []
     for y_col, color in zip(y_cols, palette):
         try:
-            if not df[y_col].isna().all():
+            if not df[y_col].isna().all(axis=None):
                 if isinstance(y_col, tuple):  # if columns have MultiIndex
                     y_col = "_" . join(y_col)  # join to match 'source' object
                 if kind == 'line':
@@ -1044,7 +1047,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
             logger.error('Error with column "%s"', y_col)
             raise
 
-    if all([df[y_col].isna().all() for y_col in y_cols]):
+    if all([df[y_col].isna().all(axis=None) for y_col in y_cols]):
         return column([p], sizing_mode=sizing_mode)
     else:
         custom_bokeh_settings(p)  # Set additional features of the plot
