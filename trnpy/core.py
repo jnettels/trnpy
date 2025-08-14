@@ -64,7 +64,7 @@ class TRNExe():
     """
 
     def __init__(self,
-                 path_TRNExe=r'C:\Trnsys17\Exe\TRNExe.exe',
+                 path_TRNExe=r'C:\Trnsys18\Exe\TrnEXE64.exe',
                  mode_trnsys_hidden=False,
                  mode_exec_parallel=False,
                  n_cores=0,
@@ -721,7 +721,7 @@ class DCK_processor():
     new frequencies, e.g. from hours to months.
     """
 
-    def __init__(self, sim_folder=r'C:\Trnsys17\Work\batch',
+    def __init__(self, sim_folder=r'C:\Trnsys18\Work\batch',
                  regex_result_files=regex_result_files_def):
         self.sim_folder = sim_folder
         self.regex_result_files = regex_result_files
@@ -1823,18 +1823,10 @@ class SimStudio():
       /d create deck file
       /r run simulation
       /q quit
-
-    Other useful command line features of TRNSYS (not implemented):
-
-    TRNBuild: Create VFM from command line
-    subprocess.call(r'"C:\TRNSYS18\Building\TRNBuild.exe" "file.b18" /N /vfm')
-
-    TRNBuild: Create SHM/ISM from command line
-    subprocess.call(r'"C:\TRNSYS18\Building\TRNBuild.exe" "file.b18" /N /masks')
     """
 
     def __init__(self,
-                 path_Studio=r'C:\Trnsys17\Studio\Exe\Studio.exe',
+                 path_Studio=r'C:\Trnsys18\Studio\Exe\Studio.exe',
                  ):
         """Initialize a Simulation Studio object.
 
@@ -1881,4 +1873,63 @@ class SimStudio():
         ret = subprocess.call(args)
         if ret != 0 and not silence_errors:
             raise ValueError("Simulation Studio returned error")
+        return ret
+
+
+class TRNBuild():
+    r"""Define the TRNBuild class.
+
+    Can be used to create view factor matrix file and shading matrix file
+    from a TRNBuild file (.b18).
+    """
+
+    def __init__(self,
+                 path_TRNBuild=r'C:\TRNSYS18\Building\TRNBuild.exe',
+                 ):
+        """Initialize a TRNBuild object.
+
+        Args:
+            path_TRNBuild (str, optional): Path to TRNBuild executable
+
+        Returns:
+            None
+        """
+        self.path_TRNBuild = path_TRNBuild
+
+    def create_vfm_from_b18(self, b18, silence_errors=False):
+        """Create a view factor matrix file from a .b18 TRNBuild file.
+
+        Args:
+            b18 (str): Path to a TRNBuild file.
+
+        Returns:
+            ret (int): A return value of 0 indicates success
+
+        """
+        args = [self.path_TRNBuild, os.path.abspath(b18), '/n', '/vfm']
+
+        logger.info("Calling TRNBuild with command '%s'",
+                    ' '.join(args))
+        ret = subprocess.call(args)
+        if ret != 0 and not silence_errors:
+            raise ValueError("TRNBuild returned error")
+        return ret
+
+    def create_masks_from_b18(self, b18, silence_errors=False):
+        """Create a shading matrix file from a .b18 TRNBuild file.
+
+        Args:
+            b18 (str): Path to a TRNBuild file.
+
+        Returns:
+            ret (int): A return value of 0 indicates success
+
+        """
+        args = [self.path_TRNBuild, os.path.abspath(b18), '/n', '/masks']
+
+        logger.info("Calling TRNBuild with command '%s'",
+                    ' '.join(args))
+        ret = subprocess.call(args)
+        if ret != 0 and not silence_errors:
+            raise ValueError("TRNBuild returned error")
         return ret
