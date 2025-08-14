@@ -5,12 +5,12 @@ on: [push, pull_request]
 jobs:
   job_1:
     runs-on: ${{ matrix.os }}
-    name: Build
+    name: Test conda
     strategy:
       fail-fast: false  # complete remaining jobs
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - name: Checkout
@@ -42,3 +42,24 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  job_2:
+    runs-on: ${{ matrix.os }}
+    name: Test pip
+    strategy:
+      fail-fast: false  # complete remaining jobs
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5  # use the latest code commit
+
+    - name: Setup pip with python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install with pip
+      run: |
+        pip install .[full]
