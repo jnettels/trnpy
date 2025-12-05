@@ -70,7 +70,7 @@ try:
     try:  # Code tries to be compatible with bokeh 2 and 3
         from bokeh.models import TabPanel  # bokeh >= 3.0
     except ImportError:
-        from bokeh.models import Panel  # bokeh < 3.0
+        from bokeh.models import Panel as TabPanel  # bokeh < 3.0
 
 except ImportError as e:
     logger.exception(e)
@@ -719,7 +719,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
         # Activation of the tool is not required in bokeh>=3.0
         pass
 
-    return column(p, select)
+    return column(p, select, sizing_mode='stretch_both')
 
 
 def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
@@ -729,6 +729,11 @@ def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
     Split into different html files if number of tabs exceed max_tabs.
     Otherwise file sizes become to large.
     """
+    # tab_grouper is expected to be an index level. If it is a column level,
+    # make it an index level
+    if tab_grouper not in df.index.names and tab_grouper in df.columns.names:
+        df = df.stack(tab_grouper)
+
     file_list = []
     df_list = []
 
@@ -744,6 +749,8 @@ def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
         tab_last = max_tabs
         while tab_first < tabs:
             hashes_select = hashes[tab_first:tab_last]
+            # Make tab_grouper the first level, to allow the following '.loc'
+            df = df.swaplevel(0, tab_grouper, axis=0)
             df_list.append(df.loc[hashes_select])
             if tab_first == tab_last-1:
                 file_list.append(
@@ -802,7 +809,6 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
                       sizing_mode='stretch_width',
                       time_names=['Zeit', 'Time', 'TIME'],
                       dropna_cols=False,
-                      margin=(0, 9, 0, 0),
                       kind='line',
                       **kwargs):
     """Create a Bokeh html document from a Pandas DataFrame.
@@ -868,12 +874,9 @@ def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
             # Get the list of figures for the current hash
             fig_list = create_bokeh_timelines(df_hash, sync_xaxis=sync_xaxis,
                                               sizing_mode=sizing_mode,
-                                              margin=margin, **kwargs)
-            _column = column([div, *fig_list], sizing_mode=sizing_mode)
-            try:  # bokeh < 3.0
-                tab_list.append(Panel(child=_column, title=str(_hash)))
-            except NameError:  # bokeh >= 3.0
-                tab_list.append(TabPanel(child=_column, title=str(_hash)))
+                                              **kwargs)
+            _column = layout([div, *fig_list], sizing_mode=sizing_mode)
+            tab_list.append(TabPanel(child=_column, title=str(_hash)))
 
         elements = Tabs(tabs=tab_list)
     else:
@@ -1027,7 +1030,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
     # Create the primary plot figure
     p = figure(x_axis_type=x_axis_type,
                x_range=fig_x_range, output_backend=output_backend,
-               title=title, **kwargs)
+               title=title, sizing_mode=sizing_mode, **kwargs)
 
     # Create the glyphs in the figure (one line plot for each data column)
     y_cols = list(df.columns)
@@ -1059,7 +1062,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
         custom_bokeh_settings(p)  # Set additional features of the plot
 
         # Create a button to hide/show all lines
-        button = Button(label="Hide", button_type="default", default_size=50)
+        button = Button(label="Hide", button_type="default", width=50)
         callback = CustomJS(args=dict(lines=lines, button=button), code="""
             let isVisible = button.label == 'Hide'
             for (let i = 0; i < lines.length; i++) {
@@ -1082,7 +1085,7 @@ def create_bokeh_timeline(df, fig_link=None, y_label=None, title=None,
 
 def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
                          output_backend='canvas', x_axis_type='datetime',
-                         kind='line'):
+                         kind='line', include_data=True):
     """Return a new figure that uses the RangeTool to control the figure p.
 
     Args:
@@ -1101,6 +1104,12 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
 
         x_axis_type (str, optional): Type of x axis, 'datetime' or 'linear'.
 
+        kind (str, optional): Type of plot, 'line' or 'scatter'. Defaults to
+        'line'.
+
+        include_data (bool, optional): If True, show all lines of primary
+        figure in the RangeTool plot. Defaults to True.
+
     Returns:
         select (figure): Bokeh figure with a range tool.
 
@@ -1112,15 +1121,17 @@ def get_select_RangeTool(p, x_col, y_cols, source, palette=None,
                     x_axis_type=x_axis_type, y_axis_type=None,
                     toolbar_location=None, background_fill_color="#efefef",
                     output_backend=output_backend,
-                    height_policy="fixed", width_policy="fit",
+                    height_policy="fixed", sizing_mode='stretch_width',
                     )
-    for y_col in y_cols:  # Show all lines of primary figure in "select", too
-        if isinstance(y_col, tuple):  # if columns have MultiIndex
-            y_col = "_" . join(y_col)  # join to match 'source' object
-        if kind == 'line':
-            select.line(x=x_col, y=y_col, source=source)
-        elif kind == 'scatter':
-            select.scatter(x=x_col, y=y_col, source=source)
+    if include_data:
+        # Show all lines of primary figure in "select", too
+        for y_col in y_cols:
+            if isinstance(y_col, tuple):  # if columns have MultiIndex
+                y_col = "_" . join(y_col)  # join to match 'source' object
+            if kind == 'line':
+                select.line(x=x_col, y=y_col, source=source)
+            elif kind == 'scatter':
+                select.scatter(x=x_col, y=y_col, source=source)
 
     # Create a RangeTool, that will be applied to the "select" figure
     range_tool = RangeTool(x_range=p.x_range)  # Link figure and RangeTool

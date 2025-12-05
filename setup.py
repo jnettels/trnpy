@@ -55,7 +55,7 @@ setup(
     python_requires='>=3.7',
     setup_requires=['setuptools_scm'],
     extras_require={
-        'full':  ['pyyaml', 'matplotlib', 'bokeh'],
+        'full':  ['pyyaml', 'matplotlib', 'bokeh<3.7'],
     },
     packages=['trnpy', 'trnpy/examples'],
     package_data={'trnpy/examples': ['Parametrics.xlsx'], },

@@ -33,9 +33,7 @@ requirements:
         - xlsxwriter
 
     run_constrained:  # requirements of optional dependencies
-        - bokeh <3.0  # Code not adapted to versions >=3.0 yet
-        - selenium <4.3  # Required by bokeh<3.0, otherwise errors finding firefox
-        - numpy <2.0  # For compatibility with bokeh<3.0
+        - bokeh <3.7  # https://github.com/bokeh/bokeh/issues/14741
 
 about:
     home: https://github.com/jnettels/trnpy
