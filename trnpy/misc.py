@@ -157,7 +157,7 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
 
     if isinstance(df, Sequence) and not isinstance(df, str):
         # Save a list of DataFrame objects into a single Excel file
-        with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(path) as writer:
             for i, df_ in enumerate(df):
                 try:  # Use given sheet name, or just an enumeration
                     sheet = str(sheet_names[i])

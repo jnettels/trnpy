@@ -30,7 +30,6 @@ requirements:
         - pyyaml >=5.1
         - psutil
         - openpyxl
-        - xlsxwriter
 
     run_constrained:  # requirements of optional dependencies
         - bokeh <3.7  # https://github.com/bokeh/bokeh/issues/14741
