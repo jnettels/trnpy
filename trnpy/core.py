@@ -1005,7 +1005,7 @@ class DCK_processor():
         dck.regex_dict = dict()
 
     def create_dcks_from_file_list(self, dck_file_list, update_dest=False,
-                                   copy_files=False):
+                                   copy_files=False, disable_plotters=False):
         """Take a list of file paths and creates deck objects for each one.
 
         If the optional argument ``update_dest`` is True, the destination path
@@ -1035,6 +1035,12 @@ class DCK_processor():
             this calls ``dck_proc.copy_assigned_files(dck_list)`` (which
             you would have to do manually otherwise!)
 
+            disable_plotters (bool, optional): If true, disable all plotters
+            by setting their parameter 9 to '-1'. Even if TRNSYS is run in
+            'hidden' mode, the plot data is still stored in files named e.g.
+            D1_0.TMP during simulation, which can consume lots of storage
+            space. Disabling the plotters prevents this. Default is ``False``.
+
         Returns:
             dck_list (list): List of ``dck`` objects
 
@@ -1048,6 +1054,12 @@ class DCK_processor():
                 dck.file_path_dest = os.path.join(self.sim_folder,
                                                   dck.file_name,
                                                   dck.file_name+'.dck')
+            if disable_plotters:
+                self.disable_plotters(dck)
+
+        if disable_plotters:
+            self.rewrite_dcks(dck_list)
+
         if update_dest and copy_files:
             self.copy_assigned_files(dck_list)
 
