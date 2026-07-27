@@ -846,10 +846,13 @@ class DCK_processor():
                              **kwargs)
         elif filetype in ['.out']:
             # Standard format for TRNSYS: Separator is whitespace
-            df = pd.read_csv(filepath,
-                             sep=r'\s+',
-                             encoding='WINDOWS-1252',  # TRNSYS encoding
-                             **kwargs)
+            kwargs.setdefault("sep", r'\s+')  # Separator is whitespace
+            try:
+                df = pd.read_csv(filepath, **kwargs)
+            except UnicodeDecodeError:
+                logger.error("Default encoding failed, trying 'ANSI'")
+                kwargs["encoding"] = "WINDOWS-1252"  # TRNSYS encoding ("ANSI")
+                df = pd.read_csv(filepath, **kwargs)
         elif filetype in ['.dat', '.txt']:
             logger.warning('Unsupported file extension: %s. Trying to read '
                            'it like a csv file.', filetype)
