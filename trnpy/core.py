@@ -1186,6 +1186,8 @@ class DCK_processor():
 
             min_time (float): Only print warnings that occured after
             min_time. This provides focus on more important warnings.
+            If min_time = -1, only the warnings from the last simulation time
+            step are shown (useful to only see summary warnings).
             Default: 1.0 hours.
 
         Returns:
@@ -1196,7 +1198,13 @@ class DCK_processor():
             try:
                 logs = dck.df_log.xs("Warning", level="Severity",
                                      drop_level=False)
-                logs = logs[logs["Time"] > min_time]
+                if min_time >= 0:
+                    logs = logs[logs["Hour"] > min_time]
+                elif min_time == -1:
+                    logs = logs[logs["Hour"] == logs["Hour"].max()]
+                else:
+                    raise ValueError(f"min_time '{min_time}' not supported")
+
                 if not logs.empty:
                     logger.warning('Warnings in %s:\n%s', dck.file_path_dest,
                                    logs.to_string())
