@@ -1642,7 +1642,8 @@ def convert_user_next_ranges(args_list):
 
 
 def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
-                project="Project", decimals=0, time_lvl='TIME',
+                project="Project", title_html=None,
+                decimals=0, time_lvl='TIME', hash_lvl='hash',
                 near_zero=1e-2, export_title=True, unit='MWh',
                 width=1400, height=600, **kwargs):
     """Plot sankey diagram for simulation results."""
@@ -1656,8 +1657,8 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
 
     logger.debug('Plot Sankey simulation %s', sim)
 
-    if isinstance(df.index, pd.MultiIndex):
-        hash_list = df.index.get_level_values('hash').unique()
+    if isinstance(df.index, pd.MultiIndex) and hash_lvl is not None:
+        hash_list = df.index.get_level_values(hash_lvl).unique()
         df_list = [df.xs(_hash, drop_level=False) for _hash in hash_list]
         show_single_plot = False
     else:
@@ -1665,7 +1666,8 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
         df_list = [df]
         show_single_plot = True
 
-    title_html = '{} {}'.format(project, sim)
+    if title_html is None:
+        title_html = '{} {}'.format(project, sim)
     sankey_list = []
     edges_list = []
     for df_hash, _hash in zip(df_list, hash_list):
@@ -1673,7 +1675,11 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
             _hash = ' {}'.format(_hash)  # Add whitespace before
 
         for year in df_hash.index.get_level_values(level=time_lvl):
-            df_year = df_hash.xs(year, level=time_lvl, drop_level=False)
+            if isinstance(df_hash.index, pd.MultiIndex):
+                df_year = df_hash.xs(year, level=time_lvl, drop_level=False)
+            else:
+                df_year = df_hash.loc[[year]]
+
             if isinstance(year, pd.Timestamp):
                 year_int = year.year
             else:
@@ -1738,13 +1744,22 @@ def plot_sankey(df, edges_str, path_sankey, html_show=True, sim='',
         names = [str(_hash) for _hash in hash_list]
 
         edges_combined = pd.concat(edges_list, axis='columns')
-        edges_list_2 = [edges_combined.xs(h, level='hash', axis='columns',
-                                          drop_level=False) for h in hash_list]
 
-        df_to_excel(
-            df=edges_list_2+[edges_combined], sheet_names=names+['combined'],
-            path=filename_sankey+'.xlsx',
-            merge_cells=True)
+        if len(names) > 1:
+            edges_list_2 = [edges_combined.xs(
+                h, level=hash_lvl, axis='columns', drop_level=False)
+                for h in hash_list]
+
+            df_to_excel(
+                df=edges_list_2+[edges_combined],
+                sheet_names=names+['combined'],
+                path=filename_sankey+'.xlsx',
+                merge_cells=True)
+        else:
+            df_to_excel(
+                df=[edges_combined], sheet_names=['combined'],
+                path=filename_sankey+'.xlsx',
+                merge_cells=True)
     else:
         edges_list[0].to_excel(filename_sankey+'.xlsx')
     return None
@@ -1854,8 +1869,11 @@ def calc_kW_from_MWh(df, name_lvl=None, time_lvl=-1,
 
         power_cols.append(df_power_col)
 
-    df_power = pd.concat(power_cols, axis=1)
-    df = pd.concat([df, df_power], axis=1)
+    if len(power_cols) > 0:
+        df_power = pd.concat(power_cols, axis=1)
+        df = pd.concat([df, df_power], axis=1)
+    else:
+        logger.warning("Found no energy columns to convert to power")
 
     return df
 
@@ -2314,7 +2332,8 @@ def plot_annual_and_monthly(
         stacked=True, label_multiindex=False,
         ylim_m=None, ylim_a=None, ylim_sync=True,
         time_lvl="TIME", folder='Plots/Months',
-        label_table_names=False, drop_null=False):
+        label_table_names=False, drop_null=False,
+        rot_top_level=90):
     """Plot annual and monthly stacked bar charts."""
     logger.debug('Plot annual and monthly plots')
 
@@ -2430,7 +2449,7 @@ def plot_annual_and_monthly(
 
                 label_group_bar_table(axs[0], df_label,
                                       label_names=label_table_names,
-                                      rot_top_level=90)
+                                      rot_top_level=rot_top_level)
             if label_multiindex:  # grouped x-axis with more levels
                 df_label = df_year_h.rename(index=dict(zip(
                     df_year_h.index.get_level_values(time_lvl),
@@ -2438,7 +2457,7 @@ def plot_annual_and_monthly(
                     .strftime('%Y'))))
                 label_group_bar_table(axs[1], df_label,
                                       label_names=label_table_names,
-                                      rot_top_level=90)
+                                      rot_top_level=rot_top_level)
 
             plt.suptitle(title)
             custom_plot_save(
