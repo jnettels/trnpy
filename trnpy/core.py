@@ -1321,7 +1321,7 @@ class DCK_processor():
     def results_collect(self, dck_list, read_file_function, create_index=True,
                         origin=None, store_success=True, store_hours=True,
                         remove_leap_year=True, time_label_left=False,
-                        keep_only_last_year=False):
+                        keep_only_last_year=False, **kwargs):
         r"""Collect the results of the simulations.
 
         Combine the result files of the parametric runs into DataFrames. They
@@ -1391,6 +1391,9 @@ class DCK_processor():
             from the last 8760 hours of the simulation results are kept.
             Default: False
 
+            kwargs: Additional keyword arguments are handed to the provided
+            read_file_function
+
         Returns:
             result_data (dict): A dictionary with one DataFrame for each file
         """
@@ -1403,7 +1406,7 @@ class DCK_processor():
                                                 result_file)
                 # Use the provided function to read the file
                 try:
-                    df_new = read_file_function(result_file_path)
+                    df_new = read_file_function(result_file_path, **kwargs)
 
                     # Add the 'hash' and all the key, value pairs to DataFrame
                     if isinstance(dck.hash, tuple):
