@@ -52,7 +52,7 @@ jobs:
       fail-fast: false  # complete remaining jobs
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
     - name: Checkout
@@ -65,4 +65,4 @@ jobs:
 
     - name: Install with pip
       run: |
-        pip install .[full]
+        pip install .[all]

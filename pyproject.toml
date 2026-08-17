@@ -1,10 +1,56 @@
-# pyproject.toml
-
 [build-system]
-requires = ["setuptools>=42", "setuptools_scm[toml]>=6.0"]
-build-backend = "setuptools.build_meta"
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
 
-[tool.setuptools_scm]
-version_scheme = "post-release"
-local_scheme = "no-local-version"
-tag_regex = '^(?P<version>[0-9]+(?:\.[0-9]+)*)$'
+[project]
+name = "trnpy"
+description = "Parallelized TRNSYS simulation with Python"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "Joris Zimmermann", email = "joris.zimmermann@siz-energieplus.de" }
+]
+keywords = ["TRNSYS", "simulation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "pandas>=2.1",
+    "openpyxl>=3.0.3",
+    "pyyaml>=5.1",
+    "psutil",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+all = ['pyyaml', 'matplotlib', 'bokeh<3.7']
+bokeh = ["bokeh <3.7"]  # https://github.com/bokeh/bokeh/issues/14741
+sankey = ["holoviews_sankey @ https://github.com/jnettels/holoviews_sankey/archive/main.tar.gz"]
+test = ["pytest>=7.0", "pytest-cov"]
+dev = ["pytest>=7.0", "pytest-cov", "tox>=3.0"]
+
+[project.urls]
+Homepage = "https://github.com/jnettels/trnpy"
+Repository = "https://github.com/jnettels/trnpy"
+
+[project.scripts]
+trnpy = "trnpy.trnpy_script:main"
+
+[tool.flit.module]
+name = "trnpy"
+path = "src"
+
+[tool.flit.sdist]
+include = [
+    "examples/Parametrics.xlsx",
+]

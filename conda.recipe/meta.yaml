@@ -1,8 +1,6 @@
-{% set version = GIT_DESCRIBE_TAG %}
-
 package:
   name: trnpy
-  version: {{ version }}
+  version: {{ GIT_DESCRIBE_TAG }}
 
 source:
     path: ..
@@ -21,7 +19,7 @@ build:
 requirements:
     build:
         - python
-        - setuptools_scm
+        - flit-core
         - pandas >=2.0
 
     run:
