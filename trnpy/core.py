@@ -792,6 +792,8 @@ class DCK_processor():
             parametric_table (DataFrame): Pandas DataFrame
         """
         parametric_table = self.read_filetypes(param_table_file, **kwargs)
+        if "#" in parametric_table.columns:
+            parametric_table.set_index("#", inplace=True)
 
         if logger.isEnabledFor(logging.INFO):
             if not parametric_table.empty:
