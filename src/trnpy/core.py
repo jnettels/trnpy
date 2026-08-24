@@ -1156,7 +1156,10 @@ class DCK_processor():
             if not os.path.exists(os.path.dirname(dck.file_path_dest)):
                 os.makedirs(os.path.dirname(dck.file_path_dest))
 
-            with open(os.path.join(dck.file_path_dest), "w") as f:
+            with open(file=os.path.join(dck.file_path_dest),
+                      mode="w",
+                      encoding="WINDOWS-1252",  # TRNSYS encoding ("ANSI")
+                      ) as f:
                 f.write(dck.dck_text)
 
         # Print the list of the created & copied parametric deck files
