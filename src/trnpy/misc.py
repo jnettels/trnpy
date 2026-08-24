@@ -1952,6 +1952,10 @@ def label_group_bar_table(ax, df, label_names=True,
 
     def label_len(my_index, level):
         labels = my_index.get_level_values(level)
+        try:  # Try to downcast floats to integers if possible
+            labels = pd.to_numeric(labels, downcast="integer")
+        except ValueError:
+            pass
         return [(k, sum(1 for i in g)) for k, g in groupby(labels)]
 
     ypos = -1 * y_inc
