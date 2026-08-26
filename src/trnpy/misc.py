@@ -2510,7 +2510,7 @@ def plot_annual_and_monthly(
 
 def plot_sorted_load_curve(df, index_level='hash', x_col='TIME',
                            x_label="Hours", y_list=[], y_label_list=[],
-                           y_label=None, filename=None,
+                           y_label=None, filename=None, folder='',
                            export_xlsx=False, plot_show=True,
                            set_zero_to_nan=True,
                            **kwargs):
@@ -2563,7 +2563,7 @@ def plot_sorted_load_curve(df, index_level='hash', x_col='TIME',
         df_sort_list.append(df_sorted)
         hash_list.append(hash_)
 
-        custom_plot_save(filename=f'{filename} {hash_}', folder='')
+        custom_plot_save(filename=f'{filename} {hash_}', folder=folder)
 
         if plot_show:
             plt.show()
@@ -2576,6 +2576,71 @@ def plot_sorted_load_curve(df, index_level='hash', x_col='TIME',
 
     return
 
+def plot_timeseries(
+        df,
+        columns=[],
+        x_label='',
+        y_label='',
+        label_dict=None,
+        colors=None,
+        figsize=(12.0, 5.0),
+        kind='line',
+        folder='',
+        filename='plot_hourly',
+        hash_lvl='hash',
+        time_lvl="TIME",
+        grid_xaxis=True,
+        grid_yaxis=True,
+        plot_show=False,
+        ):
+    """Generate time series plots from Hour.dat."""
+    n_plots = len(df.index.unique(hash_lvl))
+    fig, axs = plt.subplots(n_plots, 1, sharex=True, sharey=True,
+                            figsize=figsize, squeeze=False,
+                            layout="constrained")
+
+    if colors is None:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    if label_dict is None:
+        label_dict = dict([(l, l) for l in columns])
+        for label in columns:
+            try:
+                groups = label.split('_')
+                g1 = groups[0]
+                subscript = ','.join(groups[1:-1])
+                label_dict[label] = rf'${g1}_{{{subscript}}}$'
+            except Exception as e:
+                logger.error(e)
+
+    for i, hash_ in enumerate(df.index.unique(hash_lvl)):
+        df_i = df.xs(hash_, level=hash_lvl).copy()
+        df_i = df_i.reset_index().set_index(time_lvl)
+        # Prevent time axis from labeling start of next year
+        df_i = df_i.shift(periods=-1, freq='infer')
+        for column, color in zip(columns, colors):
+            df_i[column].plot(ax=axs[i, 0],
+                              label=label_dict.get(column, column),
+                              color=color,
+                              kind=kind,
+                              )
+            axs[i, 0].set_xlabel(x_label)
+            axs[i, 0].set_ylabel(y_label)
+            axs[i, 0].set_title(hash_)
+            axs[i, 0].xaxis.grid(grid_xaxis)
+            axs[i, 0].yaxis.grid(grid_yaxis)
+
+    handles, labels = fig.axes[-1].get_legend_handles_labels()
+    fig.legend(handles, labels)
+
+    logger.debug('Plot {}'.format(filename))
+    custom_plot_save(filename, folder=folder)
+    if plot_show:
+        plt.show()
+    else:
+        plt.close()
+
+    return
 
 if __name__ == "__main__":
     """This is executed when the script is started directly with
