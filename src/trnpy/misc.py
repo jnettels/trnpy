@@ -2576,7 +2576,46 @@ def plot_sorted_load_curve(df, index_level='hash', x_col='TIME',
 
     return
 
+
 def plot_timeseries(
+        df,
+        hash_lvl='hash',
+        n_plots_max=None,
+        **kwargs,
+        ):
+    """Generate time series plots from hourly TRNSYS results.
+
+    Limit number of simulations grouped into one plot file to n_plots_max.
+    """
+    n_plots = len(df.index.unique(hash_lvl))
+
+    if n_plots_max is None or n_plots <= n_plots_max:
+        _plot_timeseries(df, hash_lvl=hash_lvl, **kwargs)
+    else:
+        hashes = df.index.unique(hash_lvl)
+
+        # Seperate into individual files
+        hash_first = 0
+        hash_last = n_plots_max
+
+        while hash_first < hash_last:
+            hashes_select = hashes[hash_first:hash_last]
+            _df = df.copy()
+
+            # Make tab_grouper the first level, to allow the following '.loc'
+            _df = _df.swaplevel(0, hash_lvl, axis=0).loc[hashes_select]
+
+            _kwargs = kwargs.copy()
+            _kwargs["filename"] = _kwargs["filename"] + f" {hash_first}"
+            _plot_timeseries(_df, hash_lvl=hash_lvl, **_kwargs)
+
+            hash_first += n_plots_max
+            hash_last = min(hash_last + n_plots_max, n_plots)
+
+    return
+
+
+def _plot_timeseries(
         df,
         columns=[],
         x_label='',
@@ -2592,8 +2631,9 @@ def plot_timeseries(
         grid_xaxis=True,
         grid_yaxis=True,
         plot_show=False,
+        n_plots_max=None,
         ):
-    """Generate time series plots from Hour.dat."""
+    """Generate time series plots from hourly TRNSYS results."""
     n_plots = len(df.index.unique(hash_lvl))
     fig, axs = plt.subplots(n_plots, 1, sharex=True, sharey=True,
                             figsize=figsize, squeeze=False,
@@ -2641,6 +2681,7 @@ def plot_timeseries(
         plt.close()
 
     return
+
 
 if __name__ == "__main__":
     """This is executed when the script is started directly with
