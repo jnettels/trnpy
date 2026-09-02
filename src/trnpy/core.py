@@ -852,7 +852,7 @@ class DCK_processor():
             try:
                 df = pd.read_csv(filepath, **kwargs)
             except UnicodeDecodeError:
-                logger.error("Default encoding failed, trying 'ANSI'")
+                logger.debug("Default encoding failed, trying 'ANSI'")
                 kwargs["encoding"] = "WINDOWS-1252"  # TRNSYS encoding ("ANSI")
                 df = pd.read_csv(filepath, **kwargs)
         elif filetype in ['.dat', '.txt']:
@@ -1605,7 +1605,11 @@ class DCK_processor():
                     df_hash = df.xs(hash_, drop_level=False)
                     df_hash = df_hash[-keep_steps:].copy()
                     df_hash.reset_index(inplace=True)
-                    df_hash[t_col] = df_hash[t_col] - df_hash[t_col][0]
+                    if time_label_left is True:
+                        df_hash[t_col] = df_hash[t_col] - df_hash[t_col][0]
+                    else:
+                        df_hash[t_col] = (df_hash[t_col] - df_hash[t_col][0]
+                                          + freq_float)
                     df_list.append(df_hash)
                 df = pd.concat(df_list)
 
