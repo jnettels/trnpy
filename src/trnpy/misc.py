@@ -723,7 +723,7 @@ def bokeh_time_line(df_in, y_cols=[], palette=None,
 
 
 def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
-                                      max_tabs=5, **kwargs):
+                                      max_tabs=5, title="", **kwargs):
     """Create interactive HTML documents from a Pandas DataFrame.
 
     Split into different html files if number of tabs exceed max_tabs.
@@ -736,6 +736,7 @@ def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
 
     file_list = []
     df_list = []
+    title_list = []
 
     hashes = df.index.get_level_values(tab_grouper).unique()
     tabs = len(hashes)
@@ -743,6 +744,7 @@ def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
         # Put everything into one file
         df_list.append(df)
         file_list.append(html_filename)
+        title_list.append(title)
     else:
         # Seperate into individual files
         tab_first = 0
@@ -756,21 +758,27 @@ def create_bokeh_htmls_with_tab_limit(df, tab_grouper, html_filename,
                 file_list.append(
                     '{}_{}'.format(os.path.splitext(html_filename)[0],
                                    tab_first))
+                title_list.append(
+                    '{} {}'.format(title , tab_first))
             else:
                 file_list.append(
                     '{}_[{}-{}]'.format(os.path.splitext(html_filename)[0],
                                         tab_first, tab_last-1))
+                title_list.append(
+                    '{} [{}-{}]'.format(title, tab_first, tab_last-1))
+
             tab_first += max_tabs
             tab_last = min(tab_last + max_tabs, tabs)
 
     create_bokeh_htmls(
         df_list=df_list, files=file_list,
         tab_grouper=tab_grouper,
+        title=title_list,
         **kwargs)
 
 
 def create_bokeh_htmls(df_list, files, subfolder='', html_show=False,
-                       sizing_mode='stretch_width', **kwargs):
+                       sizing_mode='stretch_width', title=None, **kwargs):
     """Create interactive HTML files with Bokeh, for each DataFrame.
 
     Args:
@@ -787,7 +795,13 @@ def create_bokeh_htmls(df_list, files, subfolder='', html_show=False,
         None.
 
     """
-    for df, file in zip(df_list, files):
+
+    if isinstance(title, Sequence) and not isinstance(title, str):
+        titles = title
+    else:
+        titles = [title] * len(df_list)
+
+    for df, file, _title in zip(df_list, files, titles):
         # Construct the output path
         filename = os.path.splitext(os.path.basename(file))[0] + '.html'
         filepath = os.path.join(os.path.dirname(file), subfolder, filename)
@@ -797,10 +811,12 @@ def create_bokeh_htmls(df_list, files, subfolder='', html_show=False,
             os.makedirs(os.path.dirname(filepath))
 
         # Create the output file
-        kwargs.setdefault('title', os.path.basename(file))
+        if _title is None:
+            _title = os.path.basename(file)
         create_bokeh_html(df,
                           html_filename=filepath, html_show=html_show,
-                          sizing_mode=sizing_mode, **kwargs)
+                          sizing_mode=sizing_mode, title=_title,
+                          **kwargs)
 
 
 def create_bokeh_html(df, title='Bokeh', tab_grouper=None,
