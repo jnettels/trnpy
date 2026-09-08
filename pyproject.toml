@@ -33,8 +33,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-all = ['pyyaml', 'matplotlib', 'bokeh<3.7']
-bokeh = ["bokeh <3.7"]  # https://github.com/bokeh/bokeh/issues/14741
+all = ["matplotlib", "bokeh"]
+bokeh = ["bokeh"]
 sankey = ["holoviews_sankey @ https://github.com/jnettels/holoviews_sankey/archive/main.tar.gz"]
 test = ["pytest>=7.0", "pytest-cov"]
 dev = ["pytest>=7.0", "pytest-cov", "tox>=3.0"]

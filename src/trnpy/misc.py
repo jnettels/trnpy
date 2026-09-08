@@ -1165,6 +1165,9 @@ def custom_bokeh_settings(p):
         p.legend.label_text_font_size = '9pt'
     p.toolbar.logo = None  # Remove Bokeh logo
 
+    # Disable "automatic activation of WheelZoomTool on focus" (if "auto")
+    p.toolbar.active_scroll = None
+
 
 def add_hover_tool(p, renderers, x_col='TIME', x_axis_type='datetime'):
     """Add hover tool to a figure p.
