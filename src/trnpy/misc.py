@@ -79,7 +79,7 @@ except ImportError as e:
 
 
 def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
-                check_permission=True, **kwargs):
+                check_permission=True, sheet_metadata="_metadata", **kwargs):
     """Write one or more DataFrames to Excel files.
 
     Can save a single DataFrame to a single Excel file or multiple DataFrames
@@ -88,6 +88,20 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
     creates the required directory.
     In case of a ``PermissionError`` (happens when the Excel file is currently
     opended), the file is instead saved with a time stamp.
+
+    If the Excel file is saved with a ``sheet_metadata``, the original
+    MultiIndex of each DataFrame can be restored when reading the file:
+
+    .. code:: python
+
+        sheet_name = "My Sheet"
+        meta = pd.read_excel(path_dims, sheet_name="_metadata", index_col=0)
+        df_dims = pd.read_excel(
+            path,
+            sheet_name=sheet_name,
+            header=list(range(meta.loc[sheet_name, "n_column_levels"])),
+            index_col=list(range(meta.loc[sheet_name, "n_index_levels"])),
+        )
 
     The list ``styles`` allows some basic formatting of specific cells,
     defined by one dict per sheet in the workbook. In the example below,
@@ -123,6 +137,10 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
         check_permission (boolean, optional): If the file already exists,
         instead try to save with an appended time stamp.
 
+        sheet_metadata (str, optional): Name of an additional sheet
+        where number of index and column levels are stored for each DataFrame.
+        Default is ``"_metadata"``
+
         freeze_panes (tuple or boolean, optional): Per default, the sheet
         cells are frozen to always keep the index visible (by determining the
         correct coordinate ``tuple``). Use ``False`` to disable this.
@@ -135,7 +153,7 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
             # Try to complete the function without this permission check
             df_to_excel(df, path, sheet_names=sheet_names, styles=styles,
                         merge_cells=merge_cells, check_permission=False,
-                        **kwargs)
+                        sheet_metadata=sheet_metadata, **kwargs)
             return  # Do not run the rest of the function
         except PermissionError as e:
             # If a PermissionError occurs, run the whole function again, but
@@ -190,6 +208,15 @@ def df_to_excel(df, path, sheet_names=[], styles=[], merge_cells=False,
                         logger.exception(ex)
                         pass
 
+            if sheet_metadata is not None:
+                df_meta = pd.DataFrame({
+                    "n_index_levels": [df_.index.nlevels for df_ in df],
+                    "n_column_levels": [df_.columns.nlevels for df_ in df],
+                    },
+                    index=sheet_names)
+                df_to_excel(df=df_meta, path=writer, sheet_name=sheet_metadata,
+                            merge_cells=merge_cells, **kwargs)
+
     else:
         # Per default, the sheet cells are frozen to keep the index visible
         if 'freeze_panes' not in kwargs or kwargs['freeze_panes'] is True:
@@ -241,7 +268,7 @@ def extract_units_from_df(df, cols_lvl, unit_lvl='Unit'):
     """
     regex = (r'(?P<name>.+)_(?P<unit>W|kW|MW|'
              'kWh|MWh|l|t|kJ|kJ/h|J|°C|K|kg/h|s|'
-             r'%|m/s|°|Pa|bar|V|A/m²|W/m²|g/kWh|l/s|m³/s|'
+             '%|m/s|°|Pa|bar|V|A/m²|W/m²|g/kWh|l/s|m³/s|'
              'EUR/MWh|EUR/kWh|EUR)$')
 
     tmy2_units = {
