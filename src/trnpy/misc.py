@@ -239,8 +239,10 @@ def extract_units_from_df(df, cols_lvl, unit_lvl='Unit'):
 
 
     """
-    regex = (r'(?P<name>.+)_(?P<unit>W|kW|MW|kWh|MWh|l|t|kJ|kJ/h|°C|kg/h|'
-             r'%|m/s|°|Pa|W/m²|g/kWh|l/s|EUR/MWh|EUR/kWh|EUR)$')
+    regex = (r'(?P<name>.+)_(?P<unit>W|kW|MW|'
+             'kWh|MWh|l|t|kJ|kJ/h|J|°C|K|kg/h|s|'
+             r'%|m/s|°|Pa|bar|V|A/m²|W/m²|g/kWh|l/s|m³/s|'
+             'EUR/MWh|EUR/kWh|EUR)$')
 
     tmy2_units = {
         'ETR': 'Wh/m²',
